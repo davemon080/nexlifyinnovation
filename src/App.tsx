@@ -103,6 +103,8 @@ const SEO = ({ title, description, schema }: { title?: string, description?: str
     <Helmet>
       <title>{siteTitle}</title>
       <meta name="description" content={siteDesc} />
+      <meta name="robots" content="index, follow" />
+      <meta name="keywords" content="web development nigeria, nexlify innovation, digital transformation, creative agency lagos, graphic design nigeria, video editing services" />
       <meta property="og:title" content={siteTitle} />
       <meta property="og:description" content={siteDesc} />
       <meta property="og:image" content={siteLogo} />
@@ -574,6 +576,51 @@ export default function App() {
   const [showBubble, setShowBubble] = useState(false);
   const [bubbleText, setBubbleText] = useState("");
 
+  const team = [
+    {
+      name: "David Simon",
+      role: "Founder & Lead Creative",
+      image: "https://iili.io/Bp1FLPV.jpg",
+      bio: "Visionary leader driving digital innovation in Nigeria.",
+      socials: { twitter: "#", linkedin: "#", instagram: "https://instagram.com/nexlify_innovation" }
+    },
+    {
+      name: "Israel Ujah",
+      role: "Manager",
+      image: "https://iili.io/Bp1YSuj.png",
+      bio: "Strategic administrator ensuring excellence in operations and service delivery.",
+      socials: { linkedin: "#" }
+    },
+    {
+      name: "Favor",
+      role: "Lead Graphic Designer",
+      image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=80",
+      bio: "Mastering the art of visual identity and digital branding.",
+      socials: { instagram: "#", dribbble: "#" }
+    },
+    {
+      name: "Divine Favor",
+      role: "Content Lead",
+      image: "https://iili.io/Bp1z2a4.jpg",
+      bio: "Crafting impactful narratives that align with our clients' success.",
+      socials: { twitter: "#", linkedin: "#" }
+    },
+    {
+      name: "Abutu Joseph",
+      role: "Content Specialist",
+      image: "https://iili.io/BpMaPnf.jpg",
+      bio: "Crafting compelling digital content and driving audience engagement.",
+      socials: { linkedin: "#", twitter: "#" }
+    },
+    {
+      name: "Anigboro Joseph",
+      role: "Content Writer",
+      image: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&w=400&q=80",
+      bio: "Dedicated to creating clear, engaging, and persuasive written content.",
+      socials: { linkedin: "#" }
+    }
+  ];
+
   const organizationSchema = {
     "@context": "https://schema.org",
     "@type": "Organization",
@@ -591,7 +638,18 @@ export default function App() {
       "areaServed": "NG",
       "availableLanguage": "English"
     },
-    "description": "Leading digital services agency and training hub in Nigeria specialization in web development and design."
+    "description": "Leading digital services agency and training hub in Nigeria specialization in web development and design.",
+    "founder": {
+      "@type": "Person",
+      "name": "David Simon"
+    },
+    "employee": team.map(member => ({
+      "@type": "Person",
+      "name": member.name,
+      "jobTitle": member.role,
+      "description": member.bio,
+      "image": member.image
+    }))
   };
 
   const servicesSchema = {
@@ -651,51 +709,6 @@ export default function App() {
       clearTimeout(initialTimeout);
     };
   }, []);
-
-  const team = [
-    {
-      name: "David Simon",
-      role: "Founder & Lead Creative",
-      image: "https://iili.io/Bp1FLPV.jpg",
-      bio: "Visionary leader driving digital innovation in Nigeria.",
-      socials: { twitter: "#", linkedin: "#", instagram: "https://instagram.com/nexlify_innovation" }
-    },
-    {
-      name: "Israel Ujah",
-      role: "Manager",
-      image: "https://iili.io/Bp1YSuj.png",
-      bio: "Strategic administrator ensuring excellence in operations and service delivery.",
-      socials: { linkedin: "#" }
-    },
-    {
-      name: "Favor",
-      role: "Lead Graphic Designer",
-      image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=80",
-      bio: "Mastering the art of visual identity and digital branding.",
-      socials: { instagram: "#", dribbble: "#" }
-    },
-    {
-      name: "Divine Favor",
-      role: "Content Lead",
-      image: "https://iili.io/Bp1z2a4.jpg",
-      bio: "Crafting impactful narratives that align with our clients' success.",
-      socials: { twitter: "#", linkedin: "#" }
-    },
-    {
-      name: "Abutu Joseph",
-      role: "Content Specialist",
-      image: "https://iili.io/BpMaPnf.jpg",
-      bio: "Crafting compelling digital content and driving audience engagement.",
-      socials: { linkedin: "#", twitter: "#" }
-    },
-    {
-      name: "Anigboro Joseph",
-      role: "Content Writer",
-      image: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&w=400&q=80",
-      bio: "Dedicated to creating clear, engaging, and persuasive written content.",
-      socials: { linkedin: "#" }
-    }
-  ];
 
   return (
     <div className="min-h-screen selection:bg-brand-primary selection:text-white">
