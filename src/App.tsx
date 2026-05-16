@@ -97,6 +97,7 @@ const SERVICES = [
 const SEO = ({ title, description, schema }: { title?: string, description?: string, schema?: any }) => {
   const siteTitle = title ? `${title} | Nexlify Innovation` : "Nexlify Innovation | Digital Transformation & Creative Excellence";
   const siteDesc = description || "Nexlify Innovation is Nigeria's premier creative agency specializing in Web Development, Graphic Design, Video Editing, and Professional Training.";
+  const siteLogo = "https://iili.io/Bp0LZ3Q.jpg";
 
   return (
     <Helmet>
@@ -104,8 +105,10 @@ const SEO = ({ title, description, schema }: { title?: string, description?: str
       <meta name="description" content={siteDesc} />
       <meta property="og:title" content={siteTitle} />
       <meta property="og:description" content={siteDesc} />
+      <meta property="og:image" content={siteLogo} />
       <meta name="twitter:title" content={siteTitle} />
       <meta name="twitter:description" content={siteDesc} />
+      <meta name="twitter:image" content={siteLogo} />
       {schema && (
         <script type="application/ld+json">
           {JSON.stringify(schema)}
@@ -667,7 +670,7 @@ export default function App() {
     {
       name: "Favor",
       role: "Lead Graphic Designer",
-      image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80",
+      image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=80",
       bio: "Mastering the art of visual identity and digital branding.",
       socials: { instagram: "#", dribbble: "#" }
     },
@@ -677,6 +680,20 @@ export default function App() {
       image: "https://iili.io/Bp1z2a4.jpg",
       bio: "Crafting impactful narratives that align with our clients' success.",
       socials: { twitter: "#", linkedin: "#" }
+    },
+    {
+      name: "Abutu Joseph",
+      role: "Content Specialist",
+      image: "https://iili.io/BpMaPnf.jpg",
+      bio: "Crafting compelling digital content and driving audience engagement.",
+      socials: { linkedin: "#", twitter: "#" }
+    },
+    {
+      name: "Anigboro Joseph",
+      role: "Content Writer",
+      image: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&w=400&q=80",
+      bio: "Dedicated to creating clear, engaging, and persuasive written content.",
+      socials: { linkedin: "#" }
     }
   ];
 
