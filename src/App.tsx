@@ -625,7 +625,7 @@ export default function App() {
     "@context": "https://schema.org",
     "@type": "Organization",
     "name": "Nexlify Innovation",
-    "url": "https://nexlify.innovation",
+    "url": "https://nexlify.com.ng",
     "logo": "https://iili.io/Bp0LZ3Q.jpg",
     "sameAs": [
       "https://facebook.com/nexlifyinnovation",
@@ -969,6 +969,7 @@ export default function App() {
         ) : (
           <motion.div
             key="about"
+            id="about"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
@@ -1011,7 +1012,7 @@ export default function App() {
               </div>
 
               {/* --- Team Section --- */}
-              <div className="mb-32">
+              <div id="team" className="mb-32">
                 <SectionHeading subtitle="Meet The Minds" align="center">The Nexlify Team</SectionHeading>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
                   {team.map((member, i) => (

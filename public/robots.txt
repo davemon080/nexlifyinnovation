@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://nexlify.innovation/sitemap.xml
+Sitemap: https://nexlify.com.ng/sitemap.xml
