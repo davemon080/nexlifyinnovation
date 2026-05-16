@@ -104,6 +104,7 @@ const SEO = ({ title, description, schema }: { title?: string, description?: str
       <title>{siteTitle}</title>
       <meta name="description" content={siteDesc} />
       <meta name="robots" content="index, follow" />
+      <meta name="google-adsense-account" content="ca-pub-1766333470648770" />
       <meta name="keywords" content="web development nigeria, nexlify innovation, digital transformation, creative agency lagos, graphic design nigeria, video editing services" />
       <meta property="og:title" content={siteTitle} />
       <meta property="og:description" content={siteDesc} />
