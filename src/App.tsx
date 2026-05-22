@@ -1073,11 +1073,7 @@ export default function App() {
               >
                 <div className="space-y-4 pt-12">
                   <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl">
-                    <h4 className="text-3xl font-bold text-brand-primary mb-1">100+</h4>
-                    <p className="text-zinc-500 text-sm font-medium">Happy Students</p>
-                  </div>
-                  <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl">
-                    <h4 className="text-3xl font-bold text-brand-secondary mb-1">50+</h4>
+                    <h4 className="text-3xl font-bold text-brand-secondary mb-1">3+</h4>
                     <p className="text-zinc-500 text-sm font-medium">Live Projects</p>
                   </div>
                 </div>
