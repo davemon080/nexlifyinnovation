@@ -308,7 +308,7 @@ export default function PortfolioView() {
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -15 }}
-            className="space-y-8 max-w-4xl mx-auto"
+            className="space-y-8 max-w-4xl lg:max-w-7xl mx-auto"
           >
             {/* Dynamic SEO Meta Tags Overrides */}
             <Helmet>
@@ -360,95 +360,110 @@ export default function PortfolioView() {
                 </div>
               </div>
 
-              {/* Core Blueprint grid */}
-              <div className="grid md:grid-cols-3 gap-6">
-                <div className="glass-card p-5 rounded-2xl">
-                  <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block">Deployment Sector</span>
-                  <span className="text-white text-sm font-bold mt-1 block">{selectedProject.category}</span>
-                </div>
-                <div className="glass-card p-5 rounded-2xl">
-                  <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block">Engineering Timeline</span>
-                  <span className="text-white text-sm font-bold mt-1 block">{selectedProject.timeline}</span>
-                </div>
-                <div className="glass-card p-5 rounded-2xl">
-                  <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block">Framework Systems</span>
-                  <div className="flex gap-1 flex-wrap mt-1.5">
-                    {selectedProject.tech.map((t) => (
-                      <span key={t} className="text-[8px] font-bold uppercase bg-zinc-900 border border-zinc-800 px-1.5 py-0.5 rounded text-zinc-400">
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Solution and Problem Layout block */}
-              <div className="space-y-6">
-                <div className="glass-card p-6 sm:p-10 rounded-[2.5rem] space-y-6">
-                  <div>
-                    <h3 className="text-white font-bold text-lg mb-2">The Challenge</h3>
-                    <p className="text-zinc-400 text-sm sm:text-base leading-relaxed">
-                      {selectedProject.problem}
-                    </p>
-                  </div>
-                  
-                  <div className="pt-6 border-t border-zinc-850">
-                    <h3 className="text-white font-bold text-lg mb-2">The Technical Solution</h3>
-                    <p className="text-zinc-400 text-sm sm:text-base leading-relaxed">
-                      {selectedProject.solution}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Outcomes Metres block */}
-                <div className="bg-brand-secondary/15 border border-brand-secondary/30 p-6 sm:p-10 rounded-[2.5rem]">
-                  <span className="text-[10px] font-bold text-brand-secondary uppercase tracking-widest block mb-2">Key Outcome Metrics</span>
-                  <p className="text-white font-bold text-lg sm:text-xl leading-relaxed">
-                    {selectedProject.outcome}
-                  </p>
-                </div>
-
-                {/* Client Feedback Card */}
-                {selectedProject.feedback && (
-                  <div className="glass-card p-6 sm:p-10 rounded-[2.5rem] space-y-6 relative overflow-hidden">
-                    <div className="absolute top-4 right-6 text-brand-secondary opacity-25 text-5xl font-black font-serif">
-                      ”
-                    </div>
+              {/* 2-Column Responsive Split Grid for Desktop */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                
+                {/* Left Column (8 columns): Narrative, Challenge, Solutions & Outcomes */}
+                <div className="lg:col-span-8 space-y-8">
+                  {/* Solution and Problem Layout block */}
+                  <div className="glass-card p-6 sm:p-10 rounded-[2.5rem] space-y-6">
                     <div>
-                      <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest block mb-3">Client Feedback</span>
-                      <p className="text-zinc-300 italic text-sm leading-relaxed mb-4">
-                        "{selectedProject.feedback.quote}"
+                      <h3 className="text-white font-bold text-lg mb-2">The Challenge</h3>
+                      <p className="text-zinc-400 text-sm sm:text-base leading-relaxed">
+                        {selectedProject.problem}
                       </p>
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-brand-secondary/15 flex items-center justify-center text-brand-secondary font-bold text-xs">
-                          {selectedProject.feedback.author[0]}
-                        </div>
-                        <div>
-                          <h5 className="text-white font-bold text-xs">{selectedProject.feedback.author}</h5>
-                          <p className="text-zinc-500 text-[10px]">{selectedProject.feedback.role}</p>
+                    </div>
+                    
+                    <div className="pt-6 border-t border-zinc-850">
+                      <h3 className="text-white font-bold text-lg mb-2">The Technical Solution</h3>
+                      <p className="text-zinc-400 text-sm sm:text-base leading-relaxed">
+                        {selectedProject.solution}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Outcomes Metres block */}
+                  <div className="bg-brand-secondary/15 border border-brand-secondary/30 p-6 sm:p-10 rounded-[2.5rem]">
+                    <span className="text-[10px] font-bold text-brand-secondary uppercase tracking-widest block mb-2">Key Outcome Metrics</span>
+                    <p className="text-white font-bold text-lg sm:text-xl leading-relaxed">
+                      {selectedProject.outcome}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Right Column (4 columns): Sticky Sidebar containing Tech details, Feedback & Action CTAs */}
+                <div className="lg:col-span-4 lg:sticky lg:top-32 space-y-6">
+                  {/* Unified Core Blueprint Sidebar Card */}
+                  <div className="glass-card p-6 rounded-[2rem] space-y-6 border border-zinc-900 bg-zinc-950/40 backdrop-blur-md">
+                    <h4 className="text-white font-extrabold text-xs uppercase tracking-wider border-b border-zinc-900 pb-3">Project Blueprint</h4>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest block">Deployment Sector</span>
+                        <span className="text-white text-xs font-bold mt-1 block">{selectedProject.category}</span>
+                      </div>
+                      
+                      <div className="border-t border-zinc-900/60 pt-4">
+                        <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest block">Engineering Timeline</span>
+                        <span className="text-white text-xs font-bold mt-1 block">{selectedProject.timeline}</span>
+                      </div>
+                      
+                      <div className="border-t border-zinc-900/60 pt-4">
+                        <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest block">Framework Systems</span>
+                        <div className="flex gap-1.5 flex-wrap mt-2">
+                          {selectedProject.tech.map((t) => (
+                            <span key={t} className="text-[8px] font-bold uppercase bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded text-zinc-400">
+                              {t}
+                            </span>
+                          ))}
                         </div>
                       </div>
                     </div>
                   </div>
-                )}
 
-                {/* Visit Site Prompt Card */}
-                {selectedProject.category === "Websites" && (
-                  <div className="glass-card p-6 sm:p-10 rounded-[2.5rem] flex flex-col sm:flex-row items-center justify-between gap-6 border border-brand-secondary/20 bg-gradient-to-r from-zinc-950 to-brand-secondary/5">
-                    <div>
-                      <h4 className="text-white font-bold text-lg mb-1">Experience the Platform Live</h4>
-                      <p className="text-zinc-400 text-xs sm:text-sm">Explore the fully deployed, highly optimized system in real-time.</p>
+                  {/* Client Feedback Card inside Sidebar */}
+                  {selectedProject.feedback && (
+                    <div className="glass-card p-6 rounded-[2rem] space-y-4 relative overflow-hidden border border-zinc-900 bg-zinc-950/40">
+                      <div className="absolute top-2 right-4 text-brand-secondary opacity-15 text-4xl font-black font-serif">
+                        ”
+                      </div>
+                      <div>
+                        <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest block mb-2">Client Feedback</span>
+                        <p className="text-zinc-300 italic text-xs leading-relaxed mb-4">
+                          "{selectedProject.feedback.quote}"
+                        </p>
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-brand-secondary/15 flex items-center justify-center text-brand-secondary font-bold text-xs">
+                            {selectedProject.feedback.author[0]}
+                          </div>
+                          <div>
+                            <h5 className="text-white font-bold text-[10px]">{selectedProject.feedback.author}</h5>
+                            <p className="text-zinc-500 text-[9px]">{selectedProject.feedback.role}</p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <a
-                      href={selectedProject.url || `https://${selectedProject.id}.nexlify.io`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-brand-secondary hover:bg-brand-secondary/90 text-white font-extrabold text-xs tracking-wider uppercase transition-all shadow-lg shadow-brand-secondary/20 cursor-pointer w-full sm:w-auto justify-center"
-                    >
-                      Launch Website <ExternalLink className="w-4 h-4" />
-                    </a>
-                  </div>
-                )}
+                  )}
+
+                  {/* Visit Site Prompt Card in Sidebar */}
+                  {selectedProject.category === "Websites" && (
+                    <div className="glass-card p-6 rounded-[2rem] space-y-4 border border-brand-secondary/20 bg-gradient-to-br from-zinc-950 to-brand-secondary/5">
+                      <div>
+                        <h4 className="text-white font-bold text-xs uppercase tracking-wider">Experience Live</h4>
+                        <p className="text-zinc-400 text-xs mt-1">Explore the fully deployed, highly optimized system in real-time.</p>
+                      </div>
+                      <a
+                        href={selectedProject.url || `https://${selectedProject.id}.nexlify.io`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-brand-secondary hover:bg-brand-secondary/90 text-white font-extrabold text-[10px] tracking-wider uppercase transition-all shadow-lg shadow-brand-secondary/20 cursor-pointer w-full justify-center"
+                      >
+                        Launch Website <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
+                  )}
+                </div>
+
               </div>
             </div>
           </motion.div>

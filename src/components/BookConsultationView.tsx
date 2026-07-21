@@ -110,8 +110,64 @@ export default function BookConsultationView() {
         </p>
       </div>
 
-      <div className="max-w-2xl mx-auto">
-        <AnimatePresence mode="wait">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start max-w-2xl lg:max-w-5xl mx-auto">
+        
+        {/* Left Column (Why Book Info) */}
+        <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-32">
+          <div className="glass-card p-6 sm:p-8 rounded-[2.5rem] border border-zinc-900 bg-zinc-950/20 backdrop-blur-sm space-y-6">
+            <span className="text-brand-primary font-bold text-[9px] uppercase tracking-[0.25em] block">Diagnostic Workstation</span>
+            <h3 className="text-white font-extrabold text-xl tracking-tight">Why consult with Nexlify lead engineers?</h3>
+            
+            <div className="space-y-4">
+              <div className="flex gap-3 items-start">
+                <div className="p-1 rounded-full bg-brand-primary/10 text-brand-primary shrink-0 mt-0.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <h4 className="text-white font-bold text-xs">Direct Architecture Scoping</h4>
+                  <p className="text-zinc-500 text-[11px] mt-0.5 leading-relaxed">Map your technical database, custom schemas, and API integration paths directly with veteran builders.</p>
+                </div>
+              </div>
+
+              <div className="flex gap-3 items-start border-t border-zinc-900 pt-4">
+                <div className="p-1 rounded-full bg-brand-primary/10 text-brand-primary shrink-0 mt-0.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <h4 className="text-white font-bold text-xs">Zero-Obligation Project Map</h4>
+                  <p className="text-zinc-500 text-[11px] mt-0.5 leading-relaxed">Walk away with an expert technical assessment and recommendation proposal at absolutely zero cost.</p>
+                </div>
+              </div>
+
+              <div className="flex gap-3 items-start border-t border-zinc-900 pt-4">
+                <div className="p-1 rounded-full bg-brand-primary/10 text-brand-primary shrink-0 mt-0.5">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <h4 className="text-white font-bold text-xs">Secure NDA Guarantee</h4>
+                  <p className="text-zinc-500 text-[11px] mt-0.5 leading-relaxed">All concept specifications, proprietary code structures, and flow diagrams are protected by confidentiality protocols.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Instant WhatsApp Support Notice */}
+            <div className="pt-4 border-t border-zinc-900 text-center space-y-3">
+              <p className="text-[11px] text-zinc-400 font-medium">Need immediate response or custom schedules?</p>
+              <a 
+                href="https://wa.me/2349074026805?text=Hello%20Nexlify%20Innovation,%20I%20have%20an%20urgent%20booking%20or%20inquiry%20regarding%20consultations."
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-3 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 hover:border-brand-primary/40 text-white rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              >
+                <MessageSquare className="w-3.5 h-3.5 text-green-500 fill-green-500/10" /> Chat With Us On WhatsApp
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column (Wizard Scheduling card) */}
+        <div className="lg:col-span-7 w-full">
+          <AnimatePresence mode="wait">
           {!bookingSuccess ? (
             <motion.div
               key="wizard"
@@ -387,6 +443,7 @@ export default function BookConsultationView() {
             </motion.div>
           )}
         </AnimatePresence>
+        </div>
       </div>
 
     </div>

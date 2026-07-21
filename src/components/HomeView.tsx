@@ -3,6 +3,7 @@ import { motion } from "motion/react";
 import { ArrowRight, Code, Palette, Smartphone, Sparkles, CheckCircle2, Shield, Zap, Globe, MessageSquare } from "lucide-react";
 import { SERVICES, PROJECTS, PROCESS_STAGES, TECH_STACK, BLOGS, COURSES } from "../data";
 import { ViewType } from "../types";
+import HeroServiceShowcase from "./HeroServiceShowcase";
 
 interface HomeViewProps {
   setView: (v: ViewType) => void;
@@ -77,53 +78,14 @@ export default function HomeView({ setView, setSelectedService }: HomeViewProps)
             </div>
           </motion.div>
 
-          {/* Interactive Floating Glass Interface */}
+          {/* Interactive 3-Card Service Showcase */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.9, rotateY: -10 }}
-            animate={{ opacity: 1, scale: 1, rotateY: 0 }}
-            transition={{ duration: 1, ease: "easeOut", delay: 0.2 }}
-            className="perspective-1000 hidden md:block"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.8, ease: "easeOut", delay: 0.25 }}
+            className="w-full"
           >
-            <div className="w-full aspect-square bg-zinc-950/40 backdrop-blur-md rounded-[3rem] border border-white/10 p-8 flex flex-col gap-6 relative overflow-hidden group shadow-2xl">
-              {/* Card light reflection overlay */}
-              <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/5 to-white/0 pointer-events-none" />
-
-              <div className="h-1/3 bg-zinc-900/75 rounded-2xl border border-white/5 p-6 flex flex-col justify-center shadow-lg transform hover:scale-[1.02] transition-all duration-300">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="p-2 rounded-lg bg-brand-primary/10 text-brand-primary">
-                    <Code className="w-5 h-5" />
-                  </div>
-                  <span className="font-bold text-sm text-white">Fullstack Deployment Engine</span>
-                </div>
-                <div className="h-2 w-3/4 bg-zinc-800/80 rounded-full mb-2 overflow-hidden">
-                  <div className="h-full w-4/5 bg-brand-primary rounded-full animate-pulse" />
-                </div>
-                <p className="text-zinc-500 text-xs">STATUS: SECURE • EDGE CDN ONLINE</p>
-              </div>
-
-              <div className="h-1/4 self-end w-4/5 bg-zinc-900/75 rounded-2xl border border-white/5 p-4 flex items-center gap-4 shadow-lg transform hover:scale-[1.02] transition-all duration-300">
-                <div className="w-10 h-10 rounded-full bg-brand-secondary/20 flex items-center justify-center text-brand-secondary">
-                  <Sparkles className="w-5 h-5" />
-                </div>
-                <div className="space-y-1.5 flex-grow">
-                  <div className="h-2 w-full bg-zinc-800/80 rounded-full" />
-                  <div className="h-2 w-2/3 bg-zinc-800/80 rounded-full" />
-                </div>
-              </div>
-
-              <div className="h-1/3 bg-brand-primary/5 rounded-2xl border border-brand-primary/10 p-6 flex flex-col justify-center shadow-lg transform hover:scale-[1.02] transition-all duration-300">
-                <div className="flex items-center gap-2 mb-2 text-brand-accent">
-                  <Palette className="w-5 h-5" />
-                  <span className="font-bold text-sm">Visual Identity Canvas</span>
-                </div>
-                <div className="flex gap-2">
-                  <span className="w-4 h-4 rounded-full bg-brand-primary" />
-                  <span className="w-4 h-4 rounded-full bg-brand-secondary" />
-                  <span className="w-4 h-4 rounded-full bg-brand-accent" />
-                  <span className="w-4 h-4 rounded-full bg-zinc-700" />
-                </div>
-              </div>
-            </div>
+            <HeroServiceShowcase setView={setView} />
           </motion.div>
         </div>
       </section>

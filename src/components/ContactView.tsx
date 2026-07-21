@@ -90,6 +90,32 @@ export default function ContactView() {
         </p>
       </div>
 
+      {/* Dynamic WhatsApp Inquiries Highlight Card */}
+      <div className="max-w-4xl mx-auto p-4 sm:p-6 rounded-none border border-brand-primary/30 bg-brand-primary/5 flex flex-col sm:flex-row items-center justify-between gap-6 text-center sm:text-left relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-green-500/5 rounded-full blur-2xl pointer-events-none" />
+        <div className="flex items-center gap-4 flex-col sm:flex-row">
+          <div className="w-12 h-12 rounded-full bg-green-500/10 text-green-400 flex items-center justify-center shrink-0">
+            <svg viewBox="0 0 24 24" className="w-6 h-6 fill-current">
+              <path d="M12.004 0C5.385 0 0 5.385 0 12.004c0 2.115.546 4.179 1.587 6.002L.057 24l6.357-1.666A11.96 11.96 0 0012.004 24c6.619 0 12.004-5.385 12.004-12.004S18.623 0 12.004 0zM17.65 14.542c-.297-.149-1.761-.869-2.033-.969-.272-.099-.47-.148-.668.149-.198.297-.768.969-.942 1.168-.173.198-.347.223-.644.074-.297-.149-1.256-.463-2.392-1.477-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.447-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" />
+            </svg>
+          </div>
+          <div className="space-y-1">
+            <h4 className="text-white font-extrabold text-sm uppercase tracking-wider">Fast-Track WhatsApp Inquiry</h4>
+            <p className="text-zinc-400 text-xs leading-relaxed max-w-xl">
+              Need immediate answers? You can chat with our team on <span className="text-green-400 font-bold">WhatsApp</span> for instant service consults and dynamic pricing!
+            </p>
+          </div>
+        </div>
+        <a
+          href="https://wa.me/2349074026805?text=Hello%20Nexlify,%20I%20want%20to%20make%20an%20inquiry%20regarding%20your%20services!"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-5 py-3 bg-green-500 hover:bg-green-600 text-white font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-green-500/15 shrink-0"
+        >
+          <span>Chat on WhatsApp</span>
+        </a>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
         
         {/* Left Column (5 cols): Office Channels & Beautiful Interactive FAQs Accordion */}

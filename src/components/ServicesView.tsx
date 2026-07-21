@@ -339,10 +339,10 @@ export default function ServicesView({ setView }: ServicesViewProps) {
                     </div>
                   </div>
 
-                  {/* Inline micro-CTA connecting directly to Book consultation */}
+                  {/* Inline micro-CTA connecting directly to Contact page */}
                   <div className="pt-4 border-t border-zinc-900/60">
                     <button
-                      onClick={() => setView("book-consultation")}
+                      onClick={() => setView("contact")}
                       className="w-full py-3.5 bg-brand-primary hover:bg-brand-primary/95 text-white text-xs font-bold uppercase tracking-wider rounded-none transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-brand-primary/10 cursor-pointer"
                     >
                       <span>Inquire about {selectedService.title}</span>
@@ -371,10 +371,10 @@ export default function ServicesView({ setView }: ServicesViewProps) {
           </div>
           <div className="md:col-span-4 flex justify-end">
             <button
-              onClick={() => setView("book-consultation")}
+              onClick={() => setView("contact")}
               className="px-6 py-3.5 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 hover:border-brand-primary/40 text-white text-xs font-bold uppercase tracking-wider transition-all rounded-none w-full md:w-auto text-center cursor-pointer"
             >
-              Schedule Workspace Session
+              Start Your Inquiry
             </button>
           </div>
         </div>
