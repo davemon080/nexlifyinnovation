@@ -60,24 +60,58 @@ export default function App() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+  // Map pathname to ViewType
+  const getPathFromView = (v: ViewType): string => {
+    switch (v) {
+      case "home": return "/";
+      case "services": return "/services";
+      case "portfolio": return "/portfolio";
+      case "about": return "/about";
+      case "training": return "/training";
+      case "blog": return "/blog";
+      case "careers": return "/careers";
+      case "contact": return "/contact";
+      case "book-consultation": return "/book-consultation";
+      case "admin-dashboard": return "/adminnexlify";
+      default: return "/";
+    }
+  };
+
+  const getViewFromPath = (path: string): ViewType => {
+    const cleanPath = path.replace(/\/$/, ""); // remove trailing slash
+    switch (cleanPath) {
+      case "":
+      case "/": 
+        return "home";
+      case "/services": 
+        return "services";
+      case "/portfolio": 
+        return "portfolio";
+      case "/about": 
+        return "about";
+      case "/training": 
+        return "training";
+      case "/blog": 
+        return "blog";
+      case "/careers": 
+        return "careers";
+      case "/contact": 
+        return "contact";
+      case "/book-consultation":
+      case "/booking":
+        return "book-consultation";
+      case "/adminnexlify": 
+        return "admin-dashboard";
+      default: 
+        return "home";
+    }
+  };
+
   // Synchronize view state when URL path is directly hit (/adminnexlify)
   useEffect(() => {
     const handleLocationChange = () => {
       const path = window.location.pathname;
-      const hash = window.location.hash;
-      const search = window.location.search;
-      
-      if (
-        path === "/adminnexlify" || 
-        path === "/adminnexlify/" || 
-        hash === "#/adminnexlify" || 
-        search.includes("adminnexlify")
-      ) {
-        setView("admin-dashboard");
-      } else if (view === "admin-dashboard") {
-        // If they navigate away via back button, reset to home
-        setView("home");
-      }
+      setView(getViewFromPath(path));
     };
 
     window.addEventListener("popstate", handleLocationChange);
@@ -94,14 +128,10 @@ export default function App() {
 
   // Update browser URL path cleanly when view state updates
   useEffect(() => {
-    if (view === "admin-dashboard") {
-      if (window.location.pathname !== "/adminnexlify") {
-        window.history.pushState(null, "", "/adminnexlify");
-      }
-    } else {
-      if (window.location.pathname === "/adminnexlify" || window.location.pathname === "/adminnexlify/") {
-        window.history.pushState(null, "", "/");
-      }
+    const currentPath = window.location.pathname;
+    const targetPath = getPathFromView(view);
+    if (currentPath !== targetPath) {
+      window.history.pushState(null, "", targetPath);
     }
   }, [view]);
 

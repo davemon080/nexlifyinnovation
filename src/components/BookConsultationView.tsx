@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { CheckCircle2, Calendar, Clock, User, Mail, MessageSquare, Phone, ArrowRight, ArrowLeft, Loader2 } from "lucide-react";
-import { saveConsultation } from "../lib/db";
+import { CheckCircle2, Calendar as CalendarIcon, Clock, User, Mail, MessageSquare, Phone, ArrowRight, ArrowLeft, Loader2 } from "lucide-react";
+import { saveConsultation, getConsultations } from "../lib/db";
 
 export default function BookConsultationView() {
   const [step, setStep] = useState(1);
@@ -17,6 +17,33 @@ export default function BookConsultationView() {
   const [bookingSuccess, setBookingSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // States for custom project focus & broad calendar clash check
+  const [isCustomServiceSelected, setIsCustomServiceSelected] = useState(false);
+  const [customService, setCustomService] = useState("");
+  const [existingBookings, setExistingBookings] = useState<any[]>([]);
+  
+  // Broad calendar month/year tracker (start at current date)
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
+
+  const monthNames = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  // Load existing records from DB to prevent double booking / clashing schedules
+  useEffect(() => {
+    const fetchBookings = async () => {
+      try {
+        const bookings = await getConsultations();
+        setExistingBookings(bookings || []);
+      } catch (err) {
+        console.error("Failed to load existing bookings:", err);
+      }
+    };
+    fetchBookings();
+  }, [bookingSuccess]);
+
   const services = [
     "Web Development",
     "Mobile App Custom build",
@@ -25,33 +52,53 @@ export default function BookConsultationView() {
     "Academy Courses Consultation"
   ];
 
-  // Helper dates (Mon to Fri)
-  const getUpcomingDays = () => {
-    const days = [];
-    const dateNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  // Calendar calculation helpers
+  const daysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
+  const firstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay();
+
+  const handlePrevMonth = () => {
+    const today = new Date();
+    if (currentYear === today.getFullYear() && currentMonth <= today.getMonth()) return;
     
-    let count = 0;
-    let index = 1; // start from tomorrow
-    while (count < 5) {
-      const d = new Date();
-      d.setDate(d.getDate() + index);
-      // Skip weekends for business consultations
-      if (d.getDay() !== 0 && d.getDay() !== 6) {
-        days.push({
-          raw: d.toISOString().split("T")[0],
-          dayName: dateNames[d.getDay()],
-          dayNum: d.getDate(),
-          month: monthNames[d.getMonth()]
-        });
-        count++;
-      }
-      index++;
+    if (currentMonth === 0) {
+      setCurrentMonth(11);
+      setCurrentYear(currentYear - 1);
+    } else {
+      setCurrentMonth(currentMonth - 1);
     }
-    return days;
   };
 
-  const days = getUpcomingDays();
+  const handleNextMonth = () => {
+    if (currentMonth === 11) {
+      setCurrentMonth(0);
+      setCurrentYear(currentYear + 1);
+    } else {
+      setCurrentMonth(currentMonth + 1);
+    }
+  };
+
+  const getLocalDateString = (year: number, month: number, day: number) => {
+    const m = String(month + 1).padStart(2, "0");
+    const d = String(day).padStart(2, "0");
+    return `${year}-${m}-${d}`;
+  };
+
+  const isPast = (dateStr: string) => {
+    const todayStr = new Date().toISOString().split("T")[0];
+    return dateStr < todayStr;
+  };
+
+  const isWeekend = (year: number, month: number, day: number) => {
+    const dayOfWeek = new Date(year, month, day).getDay();
+    return dayOfWeek === 0 || dayOfWeek === 6; // Sunday or Saturday
+  };
+
+  // Check if a slot is booked to enforce collision prevention
+  const isSlotBooked = (dateStr: string, timeStr: string) => {
+    return existingBookings.some(
+      (b) => b.date === dateStr && b.time === timeStr && b.status !== "Cancelled"
+    );
+  };
 
   const times = ["09:00 AM", "11:30 AM", "01:30 PM", "03:30 PM"];
 
@@ -206,17 +253,59 @@ export default function BookConsultationView() {
                     {services.map((serv) => (
                       <button
                         key={serv}
-                        onClick={() => setSelectedService(serv)}
+                        type="button"
+                        onClick={() => {
+                          setSelectedService(serv);
+                          setCustomService("");
+                          setIsCustomServiceSelected(false);
+                        }}
                         className={`w-full flex items-center justify-between p-4 rounded-xl border text-left text-xs sm:text-sm font-semibold transition-all ${
-                          selectedService === serv
+                          selectedService === serv && !isCustomServiceSelected
                             ? "bg-brand-primary/10 border-brand-primary/40 text-brand-primary"
                             : "bg-zinc-950/50 border-zinc-850 text-zinc-400 hover:text-white hover:bg-zinc-900/60"
                         }`}
                       >
                         {serv}
-                        {selectedService === serv && <CheckCircle2 className="w-4 h-4 text-brand-primary" />}
+                        {selectedService === serv && !isCustomServiceSelected && <CheckCircle2 className="w-4 h-4 text-brand-primary" />}
                       </button>
                     ))}
+
+                    {/* Custom project focus selector button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCustomServiceSelected(true);
+                        setSelectedService(customService);
+                      }}
+                      className={`w-full flex items-center justify-between p-4 rounded-xl border text-left text-xs sm:text-sm font-semibold transition-all ${
+                        isCustomServiceSelected
+                          ? "bg-brand-primary/10 border-brand-primary/40 text-brand-primary"
+                          : "bg-zinc-950/50 border-zinc-850 text-zinc-400 hover:text-white hover:bg-zinc-900/60"
+                      }`}
+                    >
+                      <span>Other / Custom Project Focus</span>
+                      {isCustomServiceSelected && <CheckCircle2 className="w-4 h-4 text-brand-primary" />}
+                    </button>
+
+                    {isCustomServiceSelected && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="pt-2"
+                      >
+                        <input
+                          type="text"
+                          required
+                          placeholder="Type your custom project focus (e.g. AI SaaS, Fintech Web App, etc.)"
+                          value={customService}
+                          onChange={(e) => {
+                            setCustomService(e.target.value);
+                            setSelectedService(e.target.value);
+                          }}
+                          className="w-full px-4 py-3 bg-zinc-950 border border-zinc-850 rounded-xl text-xs placeholder-zinc-600 focus:border-brand-primary focus:outline-none text-white transition-all font-semibold"
+                        />
+                      </motion.div>
+                    )}
                   </div>
                 </motion.div>
               )}
@@ -230,26 +319,110 @@ export default function BookConsultationView() {
                   className="space-y-6"
                 >
                   <div>
-                    <h3 className="text-white font-bold text-base sm:text-lg mb-4">Choose Your Preferred Date</h3>
-                    <div className="grid grid-cols-5 gap-2.5">
-                      {days.map((day) => {
-                        const isSelected = selectedDate === day.raw;
-                        return (
-                          <button
-                            key={day.raw}
-                            onClick={() => setSelectedDate(day.raw)}
-                            className={`p-3 rounded-2xl border text-center flex flex-col justify-center transition-all ${
-                              isSelected
-                                ? "bg-brand-primary border-brand-primary text-white shadow-lg shadow-brand-primary/15"
-                                : "bg-zinc-950/50 border-zinc-850 text-zinc-400 hover:text-white"
-                            }`}
-                          >
-                            <span className="text-[10px] font-bold uppercase block tracking-wider opacity-65">{day.dayName}</span>
-                            <span className="text-lg font-black block my-1">{day.dayNum}</span>
-                            <span className="text-[9px] font-bold uppercase block opacity-65">{day.month}</span>
-                          </button>
-                        );
-                      })}
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                      <h3 className="text-white font-bold text-base sm:text-lg">Choose Your Preferred Date</h3>
+                      
+                      {/* Month Navigation Control */}
+                      <div className="flex items-center gap-2 bg-zinc-950 border border-zinc-850 rounded-xl p-1 self-start sm:self-auto">
+                        <button
+                          type="button"
+                          onClick={handlePrevMonth}
+                          className="p-1.5 rounded-lg hover:bg-zinc-900 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                        >
+                          <ArrowLeft className="w-4 h-4" />
+                        </button>
+                        <span className="text-[11px] font-bold text-white px-1 select-none">
+                          {monthNames[currentMonth]} {currentYear}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleNextMonth}
+                          className="p-1.5 rounded-lg hover:bg-zinc-900 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                        >
+                          <ArrowRight className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Broad Calendar Month Grid */}
+                    <div className="bg-zinc-950/80 border border-zinc-850 rounded-2xl p-4 sm:p-5 space-y-3">
+                      {/* Day Name Header */}
+                      <div className="grid grid-cols-7 text-center text-[10px] font-bold text-zinc-500 uppercase tracking-wider pb-2 border-b border-zinc-900">
+                        <span>Su</span>
+                        <span>Mo</span>
+                        <span>Tu</span>
+                        <span>We</span>
+                        <span>Th</span>
+                        <span>Fr</span>
+                        <span>Sa</span>
+                      </div>
+                      
+                      {/* Calendar days */}
+                      <div className="grid grid-cols-7 gap-1.5">
+                        {/* Day offset spacing */}
+                        {Array.from({ length: firstDayOfMonth(currentYear, currentMonth) }).map((_, idx) => (
+                          <div key={`empty-${idx}`} className="aspect-square" />
+                        ))}
+
+                        {/* Valid Month Days */}
+                        {Array.from({ length: daysInMonth(currentYear, currentMonth) }).map((_, idx) => {
+                          const dayNum = idx + 1;
+                          const dateStr = getLocalDateString(currentYear, currentMonth, dayNum);
+                          const isSel = selectedDate === dateStr;
+                          const past = isPast(dateStr);
+                          const weekend = isWeekend(currentYear, currentMonth, dayNum);
+                          
+                          // Day-level clash helper
+                          const isFullyBooked = times.every(t => isSlotBooked(dateStr, t));
+
+                          let btnClasses = "aspect-square flex flex-col items-center justify-center rounded-xl text-xs font-bold transition-all border relative ";
+                          let labelSub = "";
+                          let isDisabled = false;
+
+                          if (past) {
+                            btnClasses += "bg-transparent border-transparent text-zinc-700 cursor-not-allowed";
+                            isDisabled = true;
+                          } else if (weekend) {
+                            btnClasses += "bg-zinc-950/20 border-transparent text-zinc-600 cursor-not-allowed";
+                            isDisabled = true;
+                            labelSub = "WE";
+                          } else if (isFullyBooked) {
+                            btnClasses += "bg-red-950/10 border-red-900/30 text-red-500/70 cursor-not-allowed";
+                            isDisabled = true;
+                            labelSub = "FULL";
+                          } else if (isSel) {
+                            btnClasses += "bg-brand-primary border-brand-primary text-white shadow-md shadow-brand-primary/20 scale-105 z-10";
+                          } else {
+                            btnClasses += "bg-zinc-900/40 border-zinc-900 text-zinc-400 hover:text-white hover:border-zinc-800 hover:bg-zinc-900/80 cursor-pointer";
+                          }
+
+                          return (
+                            <button
+                              key={`day-${dayNum}`}
+                              type="button"
+                              disabled={isDisabled}
+                              onClick={() => {
+                                setSelectedDate(dateStr);
+                                setSelectedTime(""); // Reset selected slot when day changes
+                              }}
+                              className={btnClasses}
+                              title={isFullyBooked ? "Fully Booked (Clash Prevented)" : weekend ? "Weekend" : ""}
+                            >
+                              <span>{dayNum}</span>
+                              {labelSub && (
+                                <span className={`text-[8px] font-black scale-90 mt-0.5 uppercase ${
+                                  labelSub === "FULL" ? "text-red-500" : "text-zinc-600"
+                                }`}>
+                                  {labelSub}
+                                </span>
+                              )}
+                              {!isDisabled && !isSel && existingBookings.some(b => b.date === dateStr && b.status !== "Cancelled") && (
+                                <span className="absolute bottom-1 w-1 h-1 rounded-full bg-brand-primary" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
 
@@ -258,17 +431,28 @@ export default function BookConsultationView() {
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       {times.map((t) => {
                         const isSelected = selectedTime === t;
+                        const isBooked = selectedDate ? isSlotBooked(selectedDate, t) : false;
+                        
                         return (
                           <button
                             key={t}
+                            type="button"
+                            disabled={isBooked || !selectedDate}
                             onClick={() => setSelectedTime(t)}
-                            className={`py-3.5 px-3 rounded-xl border text-center text-xs font-bold transition-all ${
-                              isSelected
+                            className={`py-3 px-2 rounded-xl border text-center text-[11px] font-bold transition-all flex flex-col items-center justify-center gap-1 min-h-[58px] ${
+                              isBooked
+                                ? "bg-zinc-950/20 border-zinc-900 text-zinc-600 cursor-not-allowed opacity-60"
+                                : isSelected
                                 ? "bg-brand-primary border-brand-primary text-white shadow-lg shadow-brand-primary/15"
-                                : "bg-zinc-950/50 border-zinc-850 text-zinc-400 hover:text-white"
+                                : "bg-zinc-950/50 border-zinc-850 text-zinc-400 hover:text-white hover:bg-zinc-900/40 cursor-pointer"
                             }`}
                           >
-                            {t}
+                            <span>{t}</span>
+                            {isBooked ? (
+                              <span className="text-[7.5px] font-bold text-red-500 bg-red-950/20 px-1 py-0.5 rounded uppercase border border-red-900/30 leading-none">Booked</span>
+                            ) : (
+                              <span className="text-[7.5px] font-semibold text-zinc-500 opacity-60">Available</span>
+                            )}
                           </button>
                         );
                       })}
