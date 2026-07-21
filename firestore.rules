@@ -1,0 +1,80 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions for validation
+    function isValidId(id) {
+      return id is string && id.size() <= 128;
+    }
+
+    // 1. consultations rules
+    match /consultations/{consultationId} {
+      allow create: if isValidId(consultationId);
+      allow read, update, delete: if true;
+    }
+
+    // 2. contact_messages rules
+    match /contact_messages/{messageId} {
+      allow create: if isValidId(messageId);
+      allow read, update, delete: if true;
+    }
+
+    // 3. job_applications rules
+    match /job_applications/{applicationId} {
+      allow create: if isValidId(applicationId);
+      allow read, update, delete: if true;
+    }
+
+    // 4. subscribers rules
+    match /subscribers/{subscriberId} {
+      allow create: if isValidId(subscriberId);
+      allow read, delete: if true;
+    }
+
+    // 5. staff_users rules
+    match /staff_users/{userId} {
+      allow create: if isValidId(userId);
+      allow read, update, delete: if true;
+    }
+
+    // 6. services rules
+    match /services/{serviceId} {
+      allow read, write: if true;
+    }
+
+    // 7. projects rules
+    match /projects/{projectId} {
+      allow read, write: if true;
+    }
+
+    // 8. courses rules
+    match /courses/{courseId} {
+      allow read, write: if true;
+    }
+
+    // 9. jobs rules
+    match /jobs/{jobId} {
+      allow read, write: if true;
+    }
+
+    // 10. blogs rules
+    match /blogs/{blogId} {
+      allow read, write: if true;
+    }
+
+    // 11. team_members rules
+    match /team_members/{memberId} {
+      allow read, write: if true;
+    }
+
+    // 12. about rules
+    match /about/{aboutId} {
+      allow read, write: if true;
+    }
+  }
+}

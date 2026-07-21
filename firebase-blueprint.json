@@ -1,0 +1,93 @@
+{
+  "entities": {
+    "Consultation": {
+      "title": "Consultation",
+      "description": "Consultation booking request",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "service": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "brief": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Completed", "Cancelled"] },
+        "staffNotes": { "type": "string" }
+      },
+      "required": ["name", "email", "whatsapp", "service", "date", "time", "brief", "status"]
+    },
+    "ContactMessage": {
+      "title": "ContactMessage",
+      "description": "Contact form message submission",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "subject": { "type": "string" },
+        "message": { "type": "string" },
+        "read": { "type": "boolean" },
+        "staffNotes": { "type": "string" }
+      },
+      "required": ["name", "email", "subject", "message", "read"]
+    },
+    "JobApplication": {
+      "title": "JobApplication",
+      "description": "Job application submission",
+      "type": "object",
+      "properties": {
+        "jobId": { "type": "string" },
+        "jobTitle": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "portfolio": { "type": "string" },
+        "note": { "type": "string" },
+        "status": { "type": "string", "enum": ["Reviewing", "Shortlisted", "Hired", "Rejected"] }
+      },
+      "required": ["jobId", "jobTitle", "name", "email", "portfolio", "note", "status"]
+    },
+    "NewsletterSubscriber": {
+      "title": "NewsletterSubscriber",
+      "description": "Newsletter subscriber email",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" }
+      },
+      "required": ["email"]
+    },
+    "StaffUser": {
+      "title": "StaffUser",
+      "description": "Administrative staff user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["CEO", "Employee"] }
+      },
+      "required": ["id", "name", "email", "role"]
+    }
+  },
+  "firestore": {
+    "/consultations/{consultationId}": {
+      "schema": "Consultation",
+      "description": "Collection of consultation bookings"
+    },
+    "/contact_messages/{messageId}": {
+      "schema": "ContactMessage",
+      "description": "Collection of contact form messages"
+    },
+    "/job_applications/{applicationId}": {
+      "schema": "JobApplication",
+      "description": "Collection of job application submissions"
+    },
+    "/subscribers/{subscriberId}": {
+      "schema": "NewsletterSubscriber",
+      "description": "Collection of newsletter subscriptions"
+    },
+    "/staff_users/{userId}": {
+      "schema": "StaffUser",
+      "description": "Collection of authorized administrative staff users"
+    }
+  }
+}
