@@ -331,8 +331,6 @@ export default function BlogView() {
                                   <div className="flex items-center gap-3 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
                                     <span>{post.date}</span>
                                     <span className="text-zinc-800">•</span>
-                                    <span>{post.readTime}</span>
-                                    <span className="text-zinc-800">•</span>
                                     <span className="text-brand-primary">{post.category}</span>
                                   </div>
 
@@ -425,8 +423,6 @@ export default function BlogView() {
                       <div className="pt-4 flex flex-col flex-grow">
                         <div className="flex items-center gap-2 mb-2 text-[9px] font-bold uppercase tracking-wider text-zinc-500">
                           <span>{post.date}</span>
-                          <span className="text-zinc-800">•</span>
-                          <span>{post.readTime}</span>
                         </div>
 
                         <h3 className="text-base font-bold text-white mb-1.5 tracking-tight group-hover:text-brand-primary transition-colors line-clamp-1">
@@ -721,11 +717,6 @@ export default function BlogView() {
                           {viewsMap[selectedPost.id] || 120}
                         </span>
                       </div>
-                    </div>
-
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-zinc-500">Read Time</span>
-                      <span className="text-zinc-300 font-bold">{selectedPost.readTime}</span>
                     </div>
 
                     <div className="flex items-center justify-between text-xs">

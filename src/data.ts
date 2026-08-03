@@ -140,6 +140,23 @@ export const PROJECTS: Project[] = [
       author: "Fatima Yusuf",
       role: "Co-Founder, Vivid Studios"
     }
+  },
+  {
+    id: "apexpackaging",
+    title: "Apex Packaging & Vector Art",
+    client: "Apex Consumer Goods",
+    category: "Graphic Designs",
+    image: "https://images.unsplash.com/photo-1581291518633-83b4ebd1d83e?auto=format&fit=crop&w=800&q=80",
+    problem: "Apex required striking modern packaging vectors for their new premium beverage line that would stand out on retail shelves.",
+    solution: "We crafted bespoke vector illustrations, custom typography, and print-ready CMYK packaging layouts across 6 product variants.",
+    tech: ["Adobe Illustrator", "Vector Art", "Print Design", "Packaging"],
+    timeline: "2 Weeks",
+    outcome: "Selected for nationwide supermarket distribution and featured in top design publications.",
+    feedback: {
+      quote: "The visual appeal on the shelf is unmatched. Sales exceeded projections in the first month.",
+      author: "Marcus Chen",
+      role: "Product Director, Apex Goods"
+    }
   }
 ];
 
@@ -247,7 +264,6 @@ export const BLOGS: BlogPost[] = [
     content: `For over a decade, WordPress was the default choice for building corporate websites. But as user expectations for web performance hit an all-time high, legacy monolith systems are proving too slow, bloated, and vulnerable to hacks.\n\nEnter the Jamstack architecture (JavaScript, APIs, and Markup). By pre-rendering page structures into blazing-fast static assets distributed on CDNs globally, and accessing server resources via lightweight serverless APIs, companies are unlocking unprecedented speeds.\n\n### Speed Matters\nStudy after study shows that a 100ms delay in website load times can hurt conversion rates by up to 7%. Jamstack sites load almost instantaneously (often under 1.0 second), compared to the 3-5 seconds of typical database-heavy WordPress configurations.\n\n### Robust Security\nBecause there is no active database connected directly to the user frontend in static sites, typical SQL injections and database hacking strategies are rendered completely useless. Your site becomes a bulletproof fortress.\n\nAt Nexlify Innovation, we help companies migrate from outdated architectures to highly performant Next.js and Tailwind setups, ensuring maximum speed, safety, and modern visual design.`,
     category: "Development",
     date: "July 12, 2026",
-    readTime: "5 min read",
     image: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=800&q=80",
     author: {
       name: "David Simon",
@@ -262,7 +278,6 @@ export const BLOGS: BlogPost[] = [
     content: `Designing digital products for emerging markets requires a fundamental shift in perspective. You are no longer designing for high-speed fiber internet and high-end modern computer monitors.\n\nInstead, you must design for 'the next billion users'—many of whom access services exclusively on low-tier mobile devices under slow 3G or 4G connections.\n\n### Performance-First UI/UX\nWhen every kilobyte counts, heavy animations and large uncompressed images become critical liabilities. We prioritize CSS-only designs, SVG iconography over heavy image folders, and lazy load assets on demand. This ensures your service loads in under two seconds, even on older smartphones.\n\n### Accessibility (WCAG AA)\nGood design is inclusive. Proper color contrast, large touch targets (minimum 44px), clear typographical hierarchies, and semantic code structures mean everyone can browse your app seamlessly, including users with visual or physical impairments.`,
     category: "Design",
     date: "June 28, 2026",
-    readTime: "4 min read",
     image: "https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?auto=format&fit=crop&w=800&q=80",
     author: {
       name: "Favor",
@@ -277,7 +292,6 @@ export const BLOGS: BlogPost[] = [
     content: `Artificial intelligence is no longer a sci-fi concept; it is an active driver of modern enterprise productivity. However, many businesses rush into AI integrations without a solid cost-containment or utility-first plan.\n\nTo see true ROI on AI integrations, companies should target narrow, high-frequency bottlenecks: customer support and automated content categorization.\n\n### Intent-Driven Chat Agents\nBy leveraging smart API calls with pre-determined system instructions, support portals can resolve up to 80% of routine client questions. This frees your human staff to handle high-value consulting, leading to dramatic productivity spikes.\n\nAt Nexlify, we specialize in implementing light, cost-contained Gemini SDK integrations tailored to actual client workflows, ensuring smart features enhance your product experience without expanding your operating budget.`,
     category: "Technology",
     date: "May 18, 2026",
-    readTime: "6 min read",
     image: "https://images.unsplash.com/photo-1677442136019-21780efad99a?auto=format&fit=crop&w=800&q=80",
     author: {
       name: "Abutu Joseph",

@@ -22,7 +22,11 @@ import {
   Settings, 
   Activity,
   UserPlus,
+  UserCheck,
+  Save,
   ArrowRight,
+  ArrowLeft,
+  AlertTriangle,
   Loader2,
   X,
   ExternalLink,
@@ -37,7 +41,16 @@ import {
   Info,
   Layout,
   Layers,
-  Users
+  Users,
+  LayoutDashboard,
+  Bell,
+  Check,
+  CheckCheck,
+  BellOff,
+  ChevronDown,
+  ChevronUp,
+  Key,
+  HelpCircle
 } from "lucide-react";
 import { 
   Consultation, 
@@ -55,8 +68,11 @@ import {
   deleteJobApplication,
   getStaffUsers,
   updateStaffRole,
+  updateStaffPermissions,
+  updateStaffProfile,
   registerStaffUser,
   loginStaffUser,
+  deleteStaffUser,
   isFirebaseConnected,
   getServices,
   saveService,
@@ -81,6 +97,7 @@ import {
   AboutPageData
 } from "../lib/db";
 import { Service, Project, Course, TeamMember, BlogPost, JobOpening } from "../types";
+import { normalizeProjectCategory } from "../lib/utils";
 
 interface ImageUploadFieldProps {
   label: string;
@@ -272,6 +289,152 @@ function ImageUploadField({ label, value, onChange, placeholder, theme }: ImageU
   );
 }
 
+export const getDefaultTabsForRole = (role: StaffUser["role"] | string): string[] => {
+  if (role === "CEO") {
+    return ["overview", "bookings", "messages", "careers", "insights_cms", "careers_cms", "training_cms", "about_cms", "portfolio_cms", "services_cms", "staff", "my_profile"];
+  }
+  if (role === "Manager") {
+    return ["overview", "bookings", "messages", "careers", "insights_cms", "careers_cms", "training_cms", "about_cms", "portfolio_cms", "services_cms", "my_profile"];
+  }
+  if (role === "Customer Support") {
+    return ["overview", "bookings", "messages", "insights_cms", "my_profile"];
+  }
+  if (role === "Designer") {
+    return ["overview", "portfolio_cms", "insights_cms", "my_profile"];
+  }
+  if (role === "Developer") {
+    return ["overview", "portfolio_cms", "insights_cms", "my_profile"];
+  }
+  if (role === "Content Editor") {
+    return ["overview", "insights_cms", "my_profile"];
+  }
+  return ["overview", "insights_cms", "my_profile"];
+};
+
+export const isTabPermitted = (tabId: string, role: string, allowedTabs?: string[]) => {
+  if (tabId === "overview" || tabId === "my_profile" || tabId === "insights_cms") return true;
+  if (role === "CEO") return true;
+
+  if (allowedTabs && Array.isArray(allowedTabs)) {
+    return allowedTabs.includes(tabId);
+  }
+
+  const defaults = getDefaultTabsForRole(role);
+  return defaults.includes(tabId);
+};
+
+export const ALL_SYSTEM_MODULES = [
+  { id: "overview", label: "Executive Overview", category: "Executive Hub", desc: "Analytics, revenue metrics & operational KPIs" },
+  { id: "bookings", label: "Client Bookings", category: "Executive Hub", desc: "Free consultation requests & schedule management" },
+  { id: "messages", label: "Messages Hub", category: "Executive Hub", desc: "Inbound client contact inquiries & lead notes" },
+  { id: "careers", label: "Job Applications", category: "Executive Hub", desc: "Candidate resumes & recruitment pipeline" },
+  { id: "insights_cms", label: "Insights CMS", category: "Content & Publishing", desc: "Tech blog posts & thought leadership publishing" },
+  { id: "careers_cms", label: "Careers CMS", category: "Content & Publishing", desc: "Active job openings & hiring descriptions" },
+  { id: "training_cms", label: "Training CMS", category: "Content & Publishing", desc: "Academy courses, curriculums & training tracks" },
+  { id: "about_cms", label: "About Us CMS", category: "Content & Publishing", desc: "Company timeline, values & leadership team bios" },
+  { id: "portfolio_cms", label: "Portfolio CMS", category: "Content & Publishing", desc: "Client case studies & design/tech showcases" },
+  { id: "services_cms", label: "Services CMS", category: "Content & Publishing", desc: "Service offerings, features & pricing tiers" },
+  { id: "staff", label: "Security & Staff", category: "System & Governance", desc: "User permissions, staff provisioning & security logs" },
+];
+
+export interface RoleGuideDetail {
+  role: StaffUser["role"];
+  title: string;
+  badgeClass: string;
+  summary: string;
+  securityLevel: "Root Level" | "Operational Level" | "Specialized Level" | "Basic Level";
+  keyResponsibilities: string[];
+}
+
+export const ROLE_PERMISSIONS_GUIDE: Record<StaffUser["role"], RoleGuideDetail> = {
+  CEO: {
+    role: "CEO",
+    title: "Chief Executive / Root Admin",
+    badgeClass: "bg-brand-primary/15 text-brand-primary border-brand-primary/30",
+    summary: "Unrestricted root administrative power across all 11 business hubs, CMS platforms, staff accounts, and security configurations.",
+    securityLevel: "Root Level",
+    keyResponsibilities: [
+      "Provision, modify, and delete staff accounts across all roles",
+      "Full read/write access across all Executive Hubs (Bookings, Messages, Careers)",
+      "Full publishing control over all 6 CMS modules",
+      "Manage system security, database node connections & administrative logs"
+    ]
+  },
+  Manager: {
+    role: "Manager",
+    title: "Operations & Content Director",
+    badgeClass: "bg-amber-500/15 text-amber-500 border-amber-500/30",
+    summary: "Complete operational management authority across client communications, candidate pipelines, and all site CMS content publishing.",
+    securityLevel: "Operational Level",
+    keyResponsibilities: [
+      "Manage client consultation schedules & booking statuses",
+      "Review and respond to incoming customer messages",
+      "Review job candidate submissions and manage recruitment pipeline",
+      "Full write/edit access across all 6 CMS publishing modules",
+      "Restricted from managing staff account roles or security settings"
+    ]
+  },
+  Developer: {
+    role: "Developer",
+    title: "Engineering Lead / Developer",
+    badgeClass: "bg-blue-500/15 text-blue-500 border-blue-500/30",
+    summary: "Technical showcase access to maintain agency case studies, engineering portfolios, tech stack tags, and live deployment links.",
+    securityLevel: "Specialized Level",
+    keyResponsibilities: [
+      "View executive dashboard analytics and performance metrics",
+      "Create, edit, and update engineering portfolio projects",
+      "Maintain live project links, tech stack badges, and code details"
+    ]
+  },
+  Designer: {
+    role: "Designer",
+    title: "Creative Director / UI Designer",
+    badgeClass: "bg-purple-500/15 text-purple-500 border-purple-500/30",
+    summary: "Creative access to publish visual design case studies, design system articles, and portfolio showcases.",
+    securityLevel: "Specialized Level",
+    keyResponsibilities: [
+      "View executive dashboard analytics and performance metrics",
+      "Update portfolio visual showcases and graphic design assets",
+      "Publish design leadership articles to the Insights CMS"
+    ]
+  },
+  "Content Editor": {
+    role: "Content Editor",
+    title: "Editorial & Content Strategist",
+    badgeClass: "bg-emerald-500/15 text-emerald-500 border-emerald-500/30",
+    summary: "Editorial authority to write, edit, format, and publish articles, news updates, and tech thoughts in the Insights CMS.",
+    securityLevel: "Specialized Level",
+    keyResponsibilities: [
+      "View executive dashboard analytics and performance metrics",
+      "Draft, edit, publish, and delete blog insights",
+      "Manage article categories, content, and author attributions"
+    ]
+  },
+  "Customer Support": {
+    role: "Customer Support",
+    title: "Client Communications Specialist",
+    badgeClass: "bg-cyan-500/15 text-cyan-500 border-cyan-500/30",
+    summary: "Front-line client relations access to process consultation bookings and reply to customer contact inquiries.",
+    securityLevel: "Specialized Level",
+    keyResponsibilities: [
+      "Review and update statuses of client consultation bookings",
+      "Read and respond to incoming contact inquiries",
+      "Ensure fast response times for prospective clients"
+    ]
+  },
+  Employee: {
+    role: "Employee",
+    title: "Standard Team Member",
+    badgeClass: "bg-slate-500/15 text-slate-500 border-slate-500/30",
+    summary: "Baseline employee account with read-only visibility into executive dashboard analytics and agency performance metrics.",
+    securityLevel: "Basic Level",
+    keyResponsibilities: [
+      "View high-level executive dashboard analytics",
+      "Read-only visibility into corporate performance KPIs"
+    ]
+  }
+};
+
 interface AdminDashboardViewProps {
   setView?: (view: any) => void;
 }
@@ -292,7 +455,7 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authName, setAuthName] = useState("");
-  const [authRole, setAuthRole] = useState<"CEO" | "Employee">("Employee");
+  const [authRole, setAuthRole] = useState<StaffUser["role"]>("Employee");
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
 
@@ -304,8 +467,101 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
   const [dataLoading, setDataLoading] = useState(false);
   const [dbStatus, setDbStatus] = useState(false);
 
+  // Notifications State
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [readNotifIds, setReadNotifIds] = useState<string[]>([]);
+
+  // Dynamically calculated real-time notifications
+  const allNotifications = [
+    ...messages.filter(m => !m.read).map(m => ({
+      id: `msg-${m.id}`,
+      title: `Unread Message: ${m.name}`,
+      subtitle: m.subject || (m.message.length > 40 ? m.message.slice(0, 40) + "..." : m.message),
+      time: m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just now",
+      type: "Message",
+      tab: "messages" as const,
+      isRead: readNotifIds.includes(`msg-${m.id}`)
+    })),
+    ...consultations.filter(c => c.status === "Pending").map(c => ({
+      id: `consult-${c.id}`,
+      title: `Pending Booking: ${c.name}`,
+      subtitle: `${c.service} • ${c.date} ${c.time}`,
+      time: c.createdAt ? new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "New",
+      type: "Booking",
+      tab: "bookings" as const,
+      isRead: readNotifIds.includes(`consult-${c.id}`)
+    })),
+    ...applications.filter(a => a.status === "Reviewing").map(a => ({
+      id: `app-${a.id}`,
+      title: `Job Applicant: ${a.name}`,
+      subtitle: `Applied for ${a.jobTitle}`,
+      time: a.submittedAt ? new Date(a.submittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "New",
+      type: "Applicant",
+      tab: "careers" as const,
+      isRead: readNotifIds.includes(`app-${a.id}`)
+    }))
+  ];
+
+  const unreadCount = allNotifications.filter(n => !n.isRead).length;
+
   // UI Active State
-  const [activeTab, setActiveTab] = useState<"bookings" | "messages" | "careers" | "insights_cms" | "careers_cms" | "training_cms" | "about_cms" | "portfolio_cms" | "services_cms" | "staff">("bookings");
+  const [activeTab, setActiveTab] = useState<"overview" | "bookings" | "messages" | "careers" | "insights_cms" | "careers_cms" | "training_cms" | "about_cms" | "portfolio_cms" | "services_cms" | "staff" | "my_profile">("overview");
+
+  // Profile state
+  const [profileName, setProfileName] = useState("");
+  const [profileAvatar, setProfileAvatar] = useState("");
+  const [profileBio, setProfileBio] = useState("");
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileSuccess, setProfileSuccess] = useState("");
+
+  // Sync profile state when currentUser updates
+  useEffect(() => {
+    if (currentUser) {
+      setProfileName(currentUser.name || "");
+      setProfileAvatar(currentUser.avatar || "");
+      setProfileBio(currentUser.bio || "");
+    }
+  }, [currentUser]);
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) return;
+    setProfileLoading(true);
+    setProfileSuccess("");
+    try {
+      const updated = await updateStaffProfile(currentUser.email, {
+        name: profileName || currentUser.name,
+        avatar: profileAvatar,
+        bio: profileBio
+      });
+      if (updated) {
+        setCurrentUser(updated);
+        sessionStorage.setItem("nexlify_admin_session", JSON.stringify(updated));
+        setStaffList(prev => prev.map(s => s.email.toLowerCase() === updated.email.toLowerCase() ? updated : s));
+        setProfileSuccess("Your staff profile picture and details have been updated successfully!");
+        setTimeout(() => setProfileSuccess(""), 4000);
+      }
+    } catch (err) {
+      console.error("Error updating staff profile:", err);
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
+  // Enforce permitted tab access based on user role
+  useEffect(() => {
+    if (currentUser) {
+      const allTabs: Array<typeof activeTab> = [
+        "overview", "bookings", "messages", "careers", 
+        "insights_cms", "careers_cms", "training_cms", 
+        "about_cms", "portfolio_cms", "services_cms", "staff", "my_profile"
+      ];
+      const permitted = allTabs.filter(id => isTabPermitted(id, currentUser.role, currentUser.allowedTabs));
+      if (permitted.length > 0 && !permitted.includes(activeTab)) {
+        setActiveTab(permitted[0]);
+      }
+    }
+  }, [currentUser, activeTab]);
   
   // Search & Filter state
   const [searchTerm, setSearchTerm] = useState("");
@@ -326,14 +582,37 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
   const [noteText, setNoteText] = useState("");
   const [savingNote, setSavingNote] = useState(false);
 
+  // Delete Popup Confirmation Modal State
+  const [deleteConfirmState, setDeleteConfirmState] = useState<{
+    isOpen: boolean;
+    title: string;
+    itemLabel?: string;
+    onConfirm: () => void;
+  }>({ isOpen: false, title: "", onConfirm: () => {} });
+
+  const triggerDeleteModal = (title: string, itemLabel: string, onConfirm: () => void) => {
+    setDeleteConfirmState({
+      isOpen: true,
+      title,
+      itemLabel,
+      onConfirm
+    });
+  };
+
   // New Staff user form (Inside CEO tab)
   const [newStaffName, setNewStaffName] = useState("");
   const [newStaffEmail, setNewStaffEmail] = useState("");
   const [newStaffPassword, setNewStaffPassword] = useState("");
-  const [newStaffRole, setNewStaffRole] = useState<"CEO" | "Employee">("Employee");
+  const [newStaffRole, setNewStaffRole] = useState<StaffUser["role"]>("Employee");
   const [newStaffError, setNewStaffError] = useState("");
   const [newStaffSuccess, setNewStaffSuccess] = useState("");
   const [newStaffLoading, setNewStaffLoading] = useState(false);
+  const [showStaffForm, setShowStaffForm] = useState(false);
+
+  // Admin Permission Guide & Roster State
+  const [guideSelectedRole, setGuideSelectedRole] = useState<StaffUser["role"]>("Manager");
+  const [guideViewMode, setGuideViewMode] = useState<"inspector" | "matrix">("inspector");
+  const [expandedRosterEmails, setExpandedRosterEmails] = useState<string[]>([]);
 
   // CMS Form States
   const [editingBlog, setEditingBlog] = useState<BlogPost | null>(null);
@@ -341,7 +620,6 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
   const [blogExcerpt, setBlogExcerpt] = useState("");
   const [blogContent, setBlogContent] = useState("");
   const [blogCategory, setBlogCategory] = useState("Technology");
-  const [blogReadTime, setBlogReadTime] = useState("5 mins read");
   const [blogImage, setBlogImage] = useState("");
   const [blogAuthorName, setBlogAuthorName] = useState("");
   const [blogAuthorRole, setBlogAuthorRole] = useState("");
@@ -384,6 +662,7 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
   const [aboutFutureMetricTitle, setAboutFutureMetricTitle] = useState("");
   const [aboutFutureMetricSubtitle, setAboutFutureMetricSubtitle] = useState("");
   const [isSavingAbout, setIsSavingAbout] = useState(false);
+  const [showAboutForm, setShowAboutForm] = useState(false);
 
   const [editingTeam, setEditingTeam] = useState<TeamMember | null>(null);
   const [teamName, setTeamName] = useState("");
@@ -439,7 +718,13 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
     const session = sessionStorage.getItem("nexlify_admin_session");
     if (session) {
       try {
-        setCurrentUser(JSON.parse(session));
+        const parsed = JSON.parse(session);
+        if (parsed && parsed.role && parsed.role !== "Employee") {
+          setCurrentUser(parsed);
+        } else {
+          sessionStorage.removeItem("nexlify_admin_session");
+          setCurrentUser(null);
+        }
       } catch {
         sessionStorage.removeItem("nexlify_admin_session");
       }
@@ -508,6 +793,8 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
       const result = await loginStaffUser(authEmail, authPassword);
       if (typeof result === "string") {
         setAuthError(result);
+      } else if (result.role === "Employee") {
+        setAuthError("Access Denied: General Employee accounts do not have console access privileges.");
       } else {
         setCurrentUser(result);
         sessionStorage.setItem("nexlify_admin_session", JSON.stringify(result));
@@ -563,15 +850,21 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
   // Action: Delete Consultation (CEO ONLY)
   const handleDeleteConsultation = async (id: string) => {
     if (currentUser?.role !== "CEO") return;
-    if (!confirm("Are you sure you want to permanently delete this booking?")) return;
-    try {
-      const ok = await deleteConsultation(id);
-      if (ok) {
-        setConsultations(prev => prev.filter(c => c.id !== id));
+    const booking = consultations.find(c => c.id === id);
+    triggerDeleteModal(
+      "Are you sure you want to permanently delete this booking request?",
+      booking ? `${booking.name} — ${booking.service || 'Consultation'}` : id,
+      async () => {
+        try {
+          const ok = await deleteConsultation(id);
+          if (ok) {
+            setConsultations(prev => prev.filter(c => c.id !== id));
+          }
+        } catch (e) {
+          console.error(e);
+        }
       }
-    } catch (e) {
-      console.error(e);
-    }
+    );
   };
 
   // Action: Save Booking Note
@@ -623,15 +916,21 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
   // Action: Delete Contact Message (CEO ONLY)
   const handleDeleteMessage = async (id: string) => {
     if (currentUser?.role !== "CEO") return;
-    if (!confirm("Are you sure you want to permanently delete this contact record?")) return;
-    try {
-      const ok = await deleteContactMessage(id);
-      if (ok) {
-        setMessages(prev => prev.filter(m => m.id !== id));
+    const msg = messages.find(m => m.id === id);
+    triggerDeleteModal(
+      "Are you sure you want to permanently delete this contact record?",
+      msg ? `${msg.name} (${msg.email})` : id,
+      async () => {
+        try {
+          const ok = await deleteContactMessage(id);
+          if (ok) {
+            setMessages(prev => prev.filter(m => m.id !== id));
+          }
+        } catch (e) {
+          console.error(e);
+        }
       }
-    } catch (e) {
-      console.error(e);
-    }
+    );
   };
 
   // Action: Update Job Application Status
@@ -649,33 +948,117 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
   // Action: Delete Job Application (CEO ONLY)
   const handleDeleteApplication = async (id: string) => {
     if (currentUser?.role !== "CEO") return;
-    if (!confirm("Are you sure you want to permanently delete this application?")) return;
+    const app = applications.find(a => a.id === id);
+    triggerDeleteModal(
+      "Are you sure you want to permanently delete this application?",
+      app ? `${app.fullName} — ${app.roleApplied}` : id,
+      async () => {
+        try {
+          const ok = await deleteJobApplication(id);
+          if (ok) {
+            setApplications(prev => prev.filter(a => a.id !== id));
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    );
+  };
+
+  // Action: Update Staff Role (CEO ONLY)
+  const handleUpdateStaffRole = async (email: string, targetRole: StaffUser["role"]) => {
+    if (currentUser?.role !== "CEO") return;
+    if (email.toLowerCase() === currentUser.email.toLowerCase()) {
+      alert("You cannot modify your own role directly. Safety protection active.");
+      return;
+    }
     try {
-      const ok = await deleteJobApplication(id);
+      const defaultNewTabs = getDefaultTabsForRole(targetRole);
+      const ok = await updateStaffRole(email, targetRole);
       if (ok) {
-        setApplications(prev => prev.filter(a => a.id !== id));
+        await updateStaffPermissions(email, defaultNewTabs);
+        setStaffList(prev => prev.map(s => s.email.toLowerCase() === email.toLowerCase() ? { ...s, role: targetRole, allowedTabs: defaultNewTabs } : s));
       }
     } catch (e) {
       console.error(e);
     }
   };
 
-  // Action: Update Staff Role (CEO ONLY)
-  const handleToggleStaffRole = async (email: string, currentRole: "CEO" | "Employee") => {
+  // Action: Toggle Staff Module Permission (CEO ONLY)
+  const handleToggleStaffPermission = async (staffEmail: string, tabId: string) => {
     if (currentUser?.role !== "CEO") return;
-    const targetRole = currentRole === "CEO" ? "Employee" : "CEO";
-    if (email.toLowerCase() === currentUser.email.toLowerCase()) {
-      alert("You cannot demote or promote yourself directly. Safety protection active.");
-      return;
+    const staffObj = staffList.find(s => s.email.toLowerCase() === staffEmail.toLowerCase());
+    if (!staffObj) return;
+
+    const currentTabs = staffObj.allowedTabs ? [...staffObj.allowedTabs] : getDefaultTabsForRole(staffObj.role);
+    const isCurrentlyAllowed = isTabPermitted(tabId, staffObj.role, staffObj.allowedTabs);
+
+    let updatedTabs: string[];
+    if (isCurrentlyAllowed) {
+      updatedTabs = currentTabs.filter(id => id !== tabId);
+    } else {
+      updatedTabs = Array.from(new Set([...currentTabs, tabId]));
     }
+
     try {
-      const ok = await updateStaffRole(email, targetRole);
+      const ok = await updateStaffPermissions(staffEmail, updatedTabs);
       if (ok) {
-        setStaffList(prev => prev.map(s => s.email.toLowerCase() === email.toLowerCase() ? { ...s, role: targetRole } : s));
+        setStaffList(prev => prev.map(s => s.email.toLowerCase() === staffEmail.toLowerCase() ? { ...s, allowedTabs: updatedTabs } : s));
+        if (staffEmail.toLowerCase() === currentUser.email.toLowerCase()) {
+          const updatedSelf = { ...currentUser, allowedTabs: updatedTabs };
+          setCurrentUser(updatedSelf);
+          sessionStorage.setItem("nexlify_admin_session", JSON.stringify(updatedSelf));
+        }
       }
     } catch (e) {
-      console.error(e);
+      console.error("Error toggling staff permission:", e);
     }
+  };
+
+  // Action: Reset Staff Permissions to Role Defaults (CEO ONLY)
+  const handleResetStaffPermissions = async (staffEmail: string) => {
+    if (currentUser?.role !== "CEO") return;
+    const staffObj = staffList.find(s => s.email.toLowerCase() === staffEmail.toLowerCase());
+    if (!staffObj) return;
+
+    const defaultTabs = getDefaultTabsForRole(staffObj.role);
+    try {
+      const ok = await updateStaffPermissions(staffEmail, defaultTabs);
+      if (ok) {
+        setStaffList(prev => prev.map(s => s.email.toLowerCase() === staffEmail.toLowerCase() ? { ...s, allowedTabs: defaultTabs } : s));
+        if (staffEmail.toLowerCase() === currentUser.email.toLowerCase()) {
+          const updatedSelf = { ...currentUser, allowedTabs: defaultTabs };
+          setCurrentUser(updatedSelf);
+          sessionStorage.setItem("nexlify_admin_session", JSON.stringify(updatedSelf));
+        }
+      }
+    } catch (e) {
+      console.error("Error resetting staff permissions:", e);
+    }
+  };
+
+  // Action: Delete Staff User (CEO ONLY)
+  const handleDeleteStaffUser = async (email: string) => {
+    if (currentUser?.role !== "CEO") return;
+    if (email.toLowerCase() === currentUser.email.toLowerCase()) {
+      alert("You cannot delete your own account directly.");
+      return;
+    }
+    const staff = staffList.find(s => s.email.toLowerCase() === email.toLowerCase());
+    triggerDeleteModal(
+      "Are you sure you want to permanently delete this staff user account?",
+      staff ? `${staff.name} (${staff.email})` : email,
+      async () => {
+        try {
+          const ok = await deleteStaffUser(email);
+          if (ok) {
+            setStaffList(prev => prev.filter(s => s.email.toLowerCase() !== email.toLowerCase()));
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    );
   };
 
   // Action: Provision New Staff member (CEO ONLY)
@@ -703,6 +1086,7 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
         // Reload staff list
         const latestStaff = await getStaffUsers();
         setStaffList(latestStaff);
+        setShowStaffForm(false);
       }
     } catch (err) {
       setNewStaffError("Failed to register user.");
@@ -716,14 +1100,14 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
   // 1. Service handlers
   const handleSaveService = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!serviceTitle || !serviceDesc) return;
+    if (!serviceTitle) return;
     const serviceObj: Service = {
       id: editingService ? editingService.id : `srv-${Math.random().toString(36).substring(2, 9)}`,
       title: serviceTitle,
-      description: serviceDesc,
-      icon: serviceIcon,
-      features: serviceFeatures.split("\n").map(f => f.trim()).filter(f => f.length > 0),
-      longDescription: serviceDesc,
+      description: serviceDesc || `${serviceTitle} engineering service & solution.`,
+      icon: serviceIcon || "Cpu",
+      features: serviceFeatures ? serviceFeatures.split("\n").map(f => f.trim()).filter(f => f.length > 0) : [],
+      longDescription: serviceDesc || `${serviceTitle} engineering service & solution.`,
       benefits: ["Highly Reliable", "Secure By Design"],
       technologies: ["React", "TypeScript", "Node.js"],
       timeline: "2-4 Weeks",
@@ -754,35 +1138,50 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
   };
 
   const handleDeleteService = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this service?")) return;
-    try {
-      await deleteService(id);
-      setCmsServices(prev => prev.filter(s => s.id !== id));
-    } catch (err) {
-      console.error(err);
-    }
+    const s = cmsServices.find(item => item.id === id);
+    triggerDeleteModal(
+      "Are you sure you want to delete this service from the live platform?",
+      s ? s.title : id,
+      async () => {
+        try {
+          await deleteService(id);
+          setCmsServices(prev => prev.filter(item => item.id !== id));
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    );
   };
 
   // 2. Project / Portfolio handlers
   const handleSaveProject = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!projectTitle || !projectDesc) return;
+    if (!projectTitle) return;
+
+    // Enforce category based on role
+    let finalCategory = projectCategory;
+    if (currentUser?.role === "Designer") {
+      finalCategory = "Graphic Designs";
+    } else if (currentUser?.role === "Developer") {
+      finalCategory = "Websites";
+    }
+
     const projectObj: Project = {
       id: editingProject ? editingProject.id : `prj-${Math.random().toString(36).substring(2, 9)}`,
       title: projectTitle,
       client: "Nexlify Client",
-      category: projectCategory,
+      category: finalCategory,
       image: projectImage || "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800&q=80",
-      problem: projectDesc,
-      solution: projectLongDesc || projectDesc,
-      tech: projectTags.split(",").map(t => t.trim()).filter(t => t.length > 0),
+      problem: projectDesc || projectTitle,
+      solution: projectLongDesc || projectDesc || projectTitle,
+      tech: projectTags ? projectTags.split(",").map(t => t.trim()).filter(t => t.length > 0) : [],
       timeline: "3 Months",
-      outcome: "Successfully launched with excellent initial performance metrics.",
+      outcome: "Successfully published.",
       createdAt: editingProject ? (editingProject.createdAt || Date.now()) : Date.now(),
       feedback: {
         quote: "Working with Nexlify was a game changer for our operations.",
-        author: "John Doe",
-        role: "Head of Operations"
+        author: "Client",
+        role: "Stakeholder"
       }
     };
     try {
@@ -795,7 +1194,13 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
       // Reset
       setEditingProject(null);
       setProjectTitle("");
-      setProjectCategory("Websites");
+      setProjectCategory(
+        currentUser?.role === "Designer"
+          ? "Graphic Designs"
+          : currentUser?.role === "Developer"
+            ? "Websites"
+            : "Websites"
+      );
       setProjectDesc("");
       setProjectLongDesc("");
       setProjectImage("");
@@ -808,27 +1213,33 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
   };
 
   const handleDeleteProject = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this project?")) return;
-    try {
-      await deleteProject(id);
-      setCmsProjects(prev => prev.filter(p => p.id !== id));
-    } catch (err) {
-      console.error(err);
-    }
+    const p = cmsProjects.find(item => item.id === id);
+    triggerDeleteModal(
+      "Are you sure you want to delete this portfolio project?",
+      p ? p.title : id,
+      async () => {
+        try {
+          await deleteProject(id);
+          setCmsProjects(prev => prev.filter(item => item.id !== id));
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    );
   };
 
   // 3. Training / Course handlers
   const handleSaveCourse = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!courseTitle || !coursePrice || !courseDuration) return;
+    if (!courseTitle) return;
     const courseObj: Course = {
       id: editingCourse ? editingCourse.id : `crs-${Math.random().toString(36).substring(2, 9)}`,
       title: courseTitle,
-      price: coursePrice,
-      duration: courseDuration,
+      price: coursePrice || "Free / Inquiry",
+      duration: courseDuration || "Self-Paced",
       variant: "primary",
-      features: courseSyllabus.split("\n").map(s => s.trim()).filter(s => s.length > 0),
-      requirements: courseTags.split(",").map(t => t.trim()).filter(t => t.length > 0),
+      features: courseSyllabus ? courseSyllabus.split("\n").map(s => s.trim()).filter(s => s.length > 0) : [],
+      requirements: courseTags ? courseTags.split(",").map(t => t.trim()).filter(t => t.length > 0) : [],
       mentors: ["Nexlify Engineering Lead"]
     };
     try {
@@ -857,32 +1268,43 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
   };
 
   const handleDeleteCourse = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this training course?")) return;
-    try {
-      await deleteCourse(id);
-      setCmsCourses(prev => prev.filter(c => c.id !== id));
-    } catch (err) {
-      console.error(err);
-    }
+    const c = cmsCourses.find(item => item.id === id);
+    triggerDeleteModal(
+      "Are you sure you want to delete this training course?",
+      c ? c.title : id,
+      async () => {
+        try {
+          await deleteCourse(id);
+          setCmsCourses(prev => prev.filter(item => item.id !== id));
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    );
   };
 
   // 4. Insights / Blog handlers
   const handleSaveBlog = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!blogTitle || !blogContent) return;
+    if (!blogTitle) return;
+
+    // Author details are automatically set from logged-in staff member's profile
+    const authorImage = currentUser?.avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80";
+    const authorName = currentUser?.name || "Nexlify Admin";
+    const authorRole = currentUser?.role || "Administrator";
+
     const blogObj: BlogPost = {
       id: editingBlog ? editingBlog.id : `blog-${Math.random().toString(36).substring(2, 9)}`,
       title: blogTitle,
-      excerpt: blogExcerpt || blogContent.substring(0, 150) + "...",
-      content: blogContent,
+      excerpt: blogExcerpt || (blogContent ? blogContent.substring(0, 150) + "..." : blogTitle),
+      content: blogContent || blogExcerpt || blogTitle,
       category: blogCategory,
-      readTime: blogReadTime,
       date: editingBlog ? editingBlog.date : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       image: blogImage || "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=800&q=80",
       author: {
-        name: blogAuthorName || currentUser?.name || "Nexlify Admin",
-        role: blogAuthorRole || currentUser?.role || "Administrator",
-        image: blogAuthorAvatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
+        name: authorName,
+        role: authorRole,
+        image: authorImage
       }
     };
     try {
@@ -898,11 +1320,7 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
       setBlogExcerpt("");
       setBlogContent("");
       setBlogCategory("Technology");
-      setBlogReadTime("5 mins read");
       setBlogImage("");
-      setBlogAuthorName("");
-      setBlogAuthorRole("");
-      setBlogAuthorAvatar("");
       setShowBlogForm(false);
     } catch (err) {
       console.error(err);
@@ -910,28 +1328,34 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
   };
 
   const handleDeleteBlog = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this blog post?")) return;
-    try {
-      await deleteBlog(id);
-      setCmsBlogs(prev => prev.filter(b => b.id !== id));
-    } catch (err) {
-      console.error(err);
-    }
+    const b = cmsBlogs.find(item => item.id === id);
+    triggerDeleteModal(
+      "Are you sure you want to delete this blog post?",
+      b ? b.title : id,
+      async () => {
+        try {
+          await deleteBlog(id);
+          setCmsBlogs(prev => prev.filter(item => item.id !== id));
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    );
   };
 
   // 5. Job / Careers handlers
   const handleSaveJob = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!jobTitle || !jobDesc) return;
+    if (!jobTitle) return;
     const jobObj: JobOpening = {
       id: editingJob ? editingJob.id : `job-${Math.random().toString(36).substring(2, 9)}`,
       title: jobTitle,
       department: jobDept,
-      location: jobLocation,
-      type: jobType,
-      description: `${jobDesc}\n\nExperience Required: ${jobExp}\nOffered Salary: ${jobSalary}`,
-      requirements: jobReqs.split("\n").map(r => r.trim()).filter(r => r.length > 0),
-      benefits: jobResps.split("\n").map(r => r.trim()).filter(r => r.length > 0)
+      location: jobLocation || "Remote",
+      type: jobType || "Full-time",
+      description: jobDesc ? `${jobDesc}\n\nExperience Required: ${jobExp}\nOffered Salary: ${jobSalary}` : `Career opening for ${jobTitle}.`,
+      requirements: jobReqs ? jobReqs.split("\n").map(r => r.trim()).filter(r => r.length > 0) : [],
+      benefits: jobResps ? jobResps.split("\n").map(r => r.trim()).filter(r => r.length > 0) : []
     };
     try {
       await saveJob(jobObj);
@@ -958,13 +1382,19 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
   };
 
   const handleDeleteJob = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this job career opening?")) return;
-    try {
-      await deleteJob(id);
-      setCmsJobs(prev => prev.filter(j => j.id !== id));
-    } catch (err) {
-      console.error(err);
-    }
+    const j = cmsJobs.find(item => item.id === id);
+    triggerDeleteModal(
+      "Are you sure you want to delete this job career opening?",
+      j ? j.title : id,
+      async () => {
+        try {
+          await deleteJob(id);
+          setCmsJobs(prev => prev.filter(item => item.id !== id));
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    );
   };
 
   // 6. About Info & Team member handlers
@@ -986,7 +1416,7 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
     try {
       await saveAboutPageData(updatedAbout);
       setCmsAboutPage(updatedAbout);
-      alert("Successfully saved updated About Page texts!");
+      setShowAboutForm(false);
     } catch (err) {
       console.error(err);
     } finally {
@@ -996,17 +1426,19 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
 
   const handleSaveTeamMemberObj = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!teamName || !teamRole) return;
+    if (!teamName) return;
+
+    const socialsObj: { linkedin?: string; twitter?: string; github?: string } = {};
+    if (teamLinkedin.trim()) socialsObj.linkedin = teamLinkedin.trim();
+    if (teamTwitter.trim()) socialsObj.twitter = teamTwitter.trim();
+    if (teamGithub.trim()) socialsObj.github = teamGithub.trim();
+
     const teamObj: TeamMember = {
       name: teamName,
-      role: teamRole,
-      bio: teamBio,
+      role: teamRole || "Team Member",
+      bio: teamBio || "",
       image: teamImage || "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=256&h=256&q=80",
-      socials: {
-        linkedin: teamLinkedin || undefined,
-        twitter: teamTwitter || undefined,
-        github: teamGithub || undefined
-      }
+      socials: socialsObj
     };
     try {
       await saveTeamMember(teamObj);
@@ -1031,13 +1463,18 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
   };
 
   const handleDeleteTeamMemberObj = async (name: string) => {
-    if (!confirm(`Are you sure you want to remove ${name} from the team?`)) return;
-    try {
-      await deleteTeamMember(name);
-      setCmsTeam(prev => prev.filter(t => t.name.toLowerCase() !== name.toLowerCase()));
-    } catch (err) {
-      console.error(err);
-    }
+    triggerDeleteModal(
+      "Are you sure you want to remove this team member from the About Page?",
+      `Team Member: ${name}`,
+      async () => {
+        try {
+          await deleteTeamMember(name);
+          setCmsTeam(prev => prev.filter(t => t.name.toLowerCase() !== name.toLowerCase()));
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    );
   };
 
   // Filtering lists based on search and filters
@@ -1160,18 +1597,44 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                 </div>
               )}
 
-              <form onSubmit={isRegistering ? handleRegister : handleLogin} className="space-y-4">
-                {isRegistering && (
+              {isRegistering ? (
+                <div className="space-y-4 text-center py-4">
+                  <div className="w-12 h-12 bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded-full flex items-center justify-center mx-auto">
+                    <ShieldAlert className="w-5 h-5 animate-pulse" />
+                  </div>
+                  <h4 className={`font-bold text-sm ${theme === "light" ? "text-slate-900" : "text-white"}`}>Self-Registration Deactivated</h4>
+                  <p className={`text-[11px] leading-relaxed max-w-xs mx-auto ${theme === "light" ? "text-slate-500" : "text-zinc-500"}`}>
+                    To maintain security integrity, public self-registration has been disabled. Administrative accounts must be created and assigned access roles directly by the CEO inside the Secure Staff Roster.
+                  </p>
+                  <p className={`text-[10px] font-bold text-zinc-500 ${theme === "light" ? "text-slate-400" : "text-zinc-500"}`}>
+                    Please contact your system CEO to request a provisioned administrator account.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setIsRegistering(false);
+                      setAuthError("");
+                    }}
+                    className={`w-full py-3 border rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer mt-2 ${
+                      theme === "light"
+                        ? "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600"
+                        : "bg-zinc-950 hover:bg-zinc-850 border-zinc-850 text-zinc-300"
+                    }`}
+                  >
+                    Return to Login
+                  </button>
+                </div>
+              ) : (
+                <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Full Name</label>
+                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Official Email Address</label>
                     <div className="relative">
-                      <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                      <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
                       <input
-                        type="text"
+                        type="email"
                         required
-                        placeholder="e.g. Israel Ujah"
-                        value={authName}
-                        onChange={(e) => setAuthName(e.target.value)}
+                        placeholder="example@nexlify.com"
+                        value={authEmail}
+                        onChange={(e) => setAuthEmail(e.target.value)}
                         className={`w-full pl-10 pr-4 py-3 border rounded-xl text-xs placeholder-zinc-600 focus:border-brand-primary focus:outline-none transition-all ${
                           theme === "light" 
                             ? "bg-slate-50 border-slate-200 text-slate-950 placeholder-slate-400" 
@@ -1180,109 +1643,58 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                       />
                     </div>
                   </div>
-                )}
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Official Email Address</label>
-                  <div className="relative">
-                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                    <input
-                      type="email"
-                      required
-                      placeholder="example@nexlify.com"
-                      value={authEmail}
-                      onChange={(e) => setAuthEmail(e.target.value)}
-                      className={`w-full pl-10 pr-4 py-3 border rounded-xl text-xs placeholder-zinc-600 focus:border-brand-primary focus:outline-none transition-all ${
-                        theme === "light" 
-                          ? "bg-slate-50 border-slate-200 text-slate-950 placeholder-slate-400" 
-                          : "bg-zinc-950 border-zinc-850 text-white placeholder-zinc-600"
-                      }`}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Security Access Key (Password)</label>
-                  <div className="relative">
-                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                    <input
-                      type="password"
-                      required
-                      placeholder="••••••••••••"
-                      value={authPassword}
-                      onChange={(e) => setAuthPassword(e.target.value)}
-                      className={`w-full pl-10 pr-4 py-3 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all ${
-                        theme === "light" 
-                          ? "bg-slate-50 border-slate-200 text-slate-950" 
-                          : "bg-zinc-950 border-zinc-850 text-white"
-                      }`}
-                    />
-                  </div>
-                </div>
-
-                {isRegistering && (
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Select Registration Access Level</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setAuthRole("Employee")}
-                        className={`py-2 px-3 border rounded-xl text-xs font-bold uppercase transition-all ${
-                          authRole === "Employee"
-                            ? "bg-zinc-850 border-zinc-750 text-white"
-                            : theme === "light"
-                              ? "bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-700"
-                              : "bg-zinc-950/40 border-zinc-900 text-zinc-500 hover:text-zinc-300"
+                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Security Access Key (Password)</label>
+                    <div className="relative">
+                      <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                      <input
+                        type="password"
+                        required
+                        placeholder="••••••••••••"
+                        value={authPassword}
+                        onChange={(e) => setAuthPassword(e.target.value)}
+                        className={`w-full pl-10 pr-4 py-3 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all ${
+                          theme === "light" 
+                            ? "bg-slate-50 border-slate-200 text-slate-950" 
+                            : "bg-zinc-950 border-zinc-850 text-white"
                         }`}
-                      >
-                        Employee Role
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setAuthRole("CEO")}
-                        className={`py-2 px-3 border rounded-xl text-xs font-bold uppercase transition-all ${
-                          authRole === "CEO"
-                            ? "bg-brand-primary/10 border-brand-primary/30 text-brand-primary"
-                            : theme === "light"
-                              ? "bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-700"
-                              : "bg-zinc-950/40 border-zinc-900 text-zinc-500 hover:text-zinc-300"
-                        }`}
-                      >
-                        CEO Role
-                      </button>
+                      />
                     </div>
                   </div>
-                )}
 
-                <button
-                  type="submit"
-                  disabled={authLoading}
-                  className="w-full py-3.5 bg-brand-primary hover:bg-brand-primary/95 text-white rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-lg shadow-brand-primary/15 transition-all cursor-pointer"
-                >
-                  {authLoading ? (
-                    <>Authenticating <Loader2 className="w-4 h-4 animate-spin" /></>
-                  ) : (
-                    <>{isRegistering ? "Provision Account" : "Access Console"} <ArrowRight className="w-4 h-4" /></>
-                  )}
-                </button>
-              </form>
+                  <button
+                    type="submit"
+                    disabled={authLoading}
+                    className="w-full py-3.5 bg-brand-primary hover:bg-brand-primary/95 text-white rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-lg shadow-brand-primary/15 transition-all cursor-pointer"
+                  >
+                    {authLoading ? (
+                      <>Authenticating <Loader2 className="w-4 h-4 animate-spin" /></>
+                    ) : (
+                      <>Access Console <ArrowRight className="w-4 h-4" /></>
+                    )}
+                  </button>
+                </form>
+              )}
 
-              <div className={`mt-6 pt-4 border-t flex justify-between items-center text-[11px] font-medium ${
-                theme === "light" ? "border-slate-150 text-slate-500" : "border-zinc-850/60 text-zinc-500"
-              }`}>
-                <span>
-                  {isRegistering ? "Already have access?" : "Need an account?"}
-                </span>
-                <button
-                  onClick={() => {
-                    setIsRegistering(!isRegistering);
-                    setAuthError("");
-                  }}
-                  className="text-brand-primary hover:underline font-bold cursor-pointer"
-                >
-                  {isRegistering ? "Sign in to existing Profile" : "Register new Staff Profile"}
-                </button>
-              </div>
+              {!isRegistering && (
+                <div className={`mt-6 pt-4 border-t flex justify-between items-center text-[11px] font-medium ${
+                  theme === "light" ? "border-slate-150 text-slate-500" : "border-zinc-850/60 text-zinc-500"
+                }`}>
+                  <span>
+                    Need an account?
+                  </span>
+                  <button
+                    onClick={() => {
+                      setIsRegistering(true);
+                      setAuthError("");
+                    }}
+                    className="text-brand-primary hover:underline font-bold cursor-pointer"
+                  >
+                    Register new Staff Profile
+                  </button>
+                </div>
+              )}
             </motion.div>
 
             {/* Quick Credentials helper tooltips */}
@@ -1298,12 +1710,13 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                   <p className="text-[11px] font-bold">Email: <span className={theme === "light" ? "text-slate-900" : "text-white"}>ceo@nexlify.com</span></p>
                   <p className="text-[11px] font-bold">Pass: <span className={theme === "light" ? "text-slate-900" : "text-white"}>ceopassword123</span></p>
                 </div>
-                <div className={`p-3 rounded-xl border text-left ${
+                <div className={`p-3 rounded-xl border text-left relative opacity-60 ${
                   theme === "light" ? "bg-slate-50 border-slate-200" : "bg-zinc-950/40 border-zinc-900"
                 }`}>
-                  <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block mb-1">Employee (Staff Access)</span>
+                  <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block mb-1">Employee (No Access)</span>
                   <p className="text-[11px] font-bold">Email: <span className={theme === "light" ? "text-slate-900" : "text-white"}>employee@nexlify.com</span></p>
                   <p className="text-[11px] font-bold">Pass: <span className={theme === "light" ? "text-slate-900" : "text-white"}>employeepassword123</span></p>
+                  <span className="absolute bottom-1.5 right-2.5 text-[8px] text-red-500 font-bold uppercase tracking-wider">Blocked</span>
                 </div>
               </div>
             </div>
@@ -1315,227 +1728,270 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
           
           {/* DESKTOP SIDEBAR MENU (Fixed on left) */}
           <aside className={`hidden lg:flex flex-col w-72 fixed inset-y-0 left-0 border-r z-30 transition-all duration-300 ${
-            theme === "light" ? "bg-white border-slate-200 text-slate-800" : "bg-zinc-950 border-zinc-900 text-zinc-100"
-          }`}>
-            {/* Logo area */}
-            <div className="p-6 border-b border-inherit flex items-center gap-3">
-              <div className="w-9 h-9 bg-zinc-900 rounded-xl flex items-center justify-center overflow-hidden border border-white/5 shadow-lg shrink-0">
-                <img src="https://iili.io/Bp0LZ3Q.jpg" alt="Nexlify Logo" className="w-full h-full object-cover" />
-              </div>
-              <div>
-                <span className={`font-display font-black text-base tracking-tight block ${theme === "light" ? "text-slate-900" : "text-white"}`}>
-                  Nexlify <span className="text-brand-primary">Innovation</span>
-                </span>
-                <span className="text-[9px] font-black uppercase text-brand-primary tracking-widest block">Admin Console</span>
+            theme === "light" ? "bg-white/95 border-slate-200/80 text-slate-800 shadow-sm" : "bg-zinc-950/95 border-zinc-900 text-zinc-100 shadow-2xl"
+          } backdrop-blur-xl`}>
+            {/* Pro Header Branding */}
+            <div className="p-5 border-b border-inherit">
+              <div className={`p-3.5 rounded-2xl border flex items-center justify-between transition-all ${
+                theme === "light" 
+                  ? "bg-slate-50/90 border-slate-200/80 shadow-sm" 
+                  : "bg-zinc-900/50 border-zinc-850/90 shadow-inner"
+              }`}>
+                <div className="flex items-center gap-3">
+                  <div className="relative w-10 h-10 rounded-xl overflow-hidden border border-brand-primary/30 shadow-md shrink-0">
+                    <img src="https://iili.io/Bp0LZ3Q.jpg" alt="Nexlify Logo" className="w-full h-full object-cover" />
+                    <span className="absolute bottom-0.5 right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-zinc-950" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`font-display font-black text-sm tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>
+                        Nexlify
+                      </span>
+                      <span className="text-[9px] font-black px-1.5 py-0.5 bg-gradient-to-r from-brand-primary to-indigo-600 text-white rounded-md uppercase tracking-widest shadow-xs">
+                        ADMIN
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-extrabold uppercase text-brand-primary tracking-wider block mt-0.5">
+                      Admin Console
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* Navigation Tabs */}
-            <nav className="flex-grow p-4 space-y-1.5 overflow-y-auto">
-              <span className={`text-[9px] font-black uppercase tracking-widest px-3 block mb-2 ${
-                theme === "light" ? "text-slate-400" : "text-zinc-500"
-              }`}>
-                Management Console
-              </span>
+            <nav className="flex-grow p-3 space-y-4 overflow-y-auto custom-scrollbar">
+              {["overview", "bookings", "messages", "careers"].some(id => isTabPermitted(id, currentUser.role, currentUser.allowedTabs)) && (
+                <div className="space-y-1">
+                  <div className="px-2.5 flex items-center justify-between text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-zinc-500 mb-1.5">
+                    <span>Executive Hub</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-brand-primary animate-pulse" />
+                  </div>
 
-              {[
-                { id: "bookings", icon: Calendar, label: "Bookings", count: consultations.length },
-                { id: "messages", icon: MessageSquare, label: "Inbox", count: messages.filter(m => !m.read).length, countBadge: true },
-                { id: "careers", icon: Users, label: "Applications", count: applications.filter(a => a.status === "Reviewing").length, countBadge: true }
-              ].map((tab) => {
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => {
-                      setActiveTab(tab.id as any);
-                      setSearchTerm("");
-                      setStatusFilter("ALL");
-                    }}
-                    className={`w-full flex items-center justify-between p-3.5 rounded-xl border text-left font-bold text-xs uppercase tracking-wider transition-all cursor-pointer ${
-                      isActive
-                        ? "bg-brand-primary/10 border-brand-primary/40 text-brand-primary shadow-lg shadow-brand-primary/5"
-                        : theme === "light"
-                          ? "bg-transparent border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100"
-                          : "bg-transparent border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/30"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <tab.icon className={`w-4 h-4 ${isActive ? "text-brand-primary" : theme === "light" ? "text-slate-400" : "text-zinc-500"}`} />
-                      <span>{tab.label}</span>
-                    </div>
-
-                    {tab.count !== undefined && tab.count > 0 && (
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
-                        isActive 
-                          ? "bg-brand-primary text-white" 
-                          : tab.countBadge 
-                            ? "bg-brand-primary/25 text-brand-primary border border-brand-primary/10 animate-pulse" 
+                  {[
+                    { id: "overview", icon: LayoutDashboard, label: "Overview Page" },
+                    { id: "bookings", icon: Calendar, label: "Bookings", count: consultations.length },
+                    { id: "messages", icon: MessageSquare, label: "Inbox Messages", count: messages.filter(m => !m.read).length, countBadge: true },
+                    { id: "careers", icon: Users, label: "Job Applicants", count: applications.filter(a => a.status === "Reviewing").length, countBadge: true }
+                  ].filter(tab => isTabPermitted(tab.id, currentUser.role, currentUser.allowedTabs)).map((tab) => {
+                    const isActive = activeTab === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => {
+                          setActiveTab(tab.id as any);
+                          setSearchTerm("");
+                          setStatusFilter("ALL");
+                        }}
+                        className={`group relative w-full flex items-center justify-between px-3 py-1.5 rounded-lg border text-left font-bold text-[11px] tracking-wide transition-all duration-200 cursor-pointer ${
+                          isActive
+                            ? "bg-gradient-to-r from-brand-primary/20 via-brand-primary/10 to-transparent border-brand-primary/40 text-brand-primary shadow-xs font-extrabold translate-x-0.5"
                             : theme === "light"
-                              ? "bg-slate-100 text-slate-600 border border-slate-200"
-                              : "bg-zinc-900 text-zinc-400 border border-zinc-850"
-                      }`}>
-                        {tab.count}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
+                              ? "bg-transparent border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80"
+                              : "bg-transparent border-transparent text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/60"
+                        }`}
+                      >
+                        {isActive && (
+                          <span className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-brand-primary rounded-r-full shadow-sm shadow-brand-primary" />
+                        )}
+                        <div className="flex items-center gap-2 pl-0.5">
+                          <tab.icon className={`w-3.5 h-3.5 transition-transform group-hover:scale-110 ${
+                            isActive ? "text-brand-primary" : theme === "light" ? "text-slate-400 group-hover:text-slate-700" : "text-zinc-500 group-hover:text-zinc-300"
+                          }`} />
+                          <span className="truncate">{tab.label}</span>
+                        </div>
 
-              <span className={`text-[9px] font-black uppercase tracking-widest px-3 block mt-6 mb-2 ${
-                theme === "light" ? "text-slate-400" : "text-zinc-500"
-              }`}>
-                Dynamic Site CMS
-              </span>
+                        {tab.count !== undefined && tab.count > 0 && (
+                          <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-black tracking-tight shrink-0 ${
+                            isActive 
+                              ? "bg-brand-primary text-white shadow-xs" 
+                              : tab.countBadge 
+                                ? "bg-brand-primary/20 text-brand-primary border border-brand-primary/30 animate-pulse" 
+                                : theme === "light"
+                                  ? "bg-slate-100 text-slate-700 border border-slate-200"
+                                  : "bg-zinc-900 text-zinc-300 border border-zinc-800"
+                          }`}>
+                            {tab.count}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
-              {[
-                { id: "insights_cms", icon: BookOpen, label: "Publish Insights" },
-                { id: "careers_cms", icon: Briefcase, label: "Publish Careers" },
-                { id: "training_cms", icon: GraduationCap, label: "Edit Training" },
-                { id: "about_cms", icon: Info, label: "Update About Page" },
-                { id: "portfolio_cms", icon: Layout, label: "Update Portfolio" },
-                { id: "services_cms", icon: Layers, label: "Update Services" }
-              ].map((tab) => {
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => {
-                      setActiveTab(tab.id as any);
-                      setSearchTerm("");
-                      setStatusFilter("ALL");
-                    }}
-                    className={`w-full flex items-center justify-between p-3.5 rounded-xl border text-left font-bold text-xs uppercase tracking-wider transition-all cursor-pointer ${
-                      isActive
-                        ? "bg-brand-primary/10 border-brand-primary/40 text-brand-primary shadow-lg shadow-brand-primary/5"
-                        : theme === "light"
-                          ? "bg-transparent border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100"
-                          : "bg-transparent border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/30"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <tab.icon className={`w-4 h-4 ${isActive ? "text-brand-primary" : theme === "light" ? "text-slate-400" : "text-zinc-500"}`} />
-                      <span>{tab.label}</span>
-                    </div>
-                  </button>
-                );
-              })}
+              {["insights_cms", "careers_cms", "training_cms", "about_cms", "portfolio_cms", "services_cms"].some(id => isTabPermitted(id, currentUser.role, currentUser.allowedTabs)) && (
+                <div className="space-y-1">
+                  <div className="px-2.5 flex items-center justify-between text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-zinc-500 mb-1.5">
+                    <span>Content & Publishing</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-500/60" />
+                  </div>
 
-              <span className={`text-[9px] font-black uppercase tracking-widest px-3 block mt-6 mb-2 ${
-                theme === "light" ? "text-slate-400" : "text-zinc-500"
-              }`}>
-                Security & Staff
-              </span>
+                  {[
+                    { id: "insights_cms", icon: BookOpen, label: "Publish Insights" },
+                    { id: "careers_cms", icon: Briefcase, label: "Publish Careers" },
+                    { id: "training_cms", icon: GraduationCap, label: "Edit Training" },
+                    { id: "about_cms", icon: Info, label: "Update About Page" },
+                    { id: "portfolio_cms", icon: Layout, label: "Update Portfolio" },
+                    { id: "services_cms", icon: Layers, label: "Update Services" }
+                  ].filter(tab => isTabPermitted(tab.id, currentUser.role, currentUser.allowedTabs)).map((tab) => {
+                    const isActive = activeTab === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => {
+                          setActiveTab(tab.id as any);
+                          setSearchTerm("");
+                          setStatusFilter("ALL");
+                        }}
+                        className={`group relative w-full flex items-center justify-between px-3 py-1.5 rounded-lg border text-left font-bold text-[11px] tracking-wide transition-all duration-200 cursor-pointer ${
+                          isActive
+                            ? "bg-gradient-to-r from-brand-primary/20 via-brand-primary/10 to-transparent border-brand-primary/40 text-brand-primary shadow-xs font-extrabold translate-x-0.5"
+                            : theme === "light"
+                              ? "bg-transparent border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80"
+                              : "bg-transparent border-transparent text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/60"
+                        }`}
+                      >
+                        {isActive && (
+                          <span className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-brand-primary rounded-r-full shadow-sm shadow-brand-primary" />
+                        )}
+                        <div className="flex items-center gap-2 pl-0.5">
+                          <tab.icon className={`w-3.5 h-3.5 transition-transform group-hover:scale-110 ${
+                            isActive ? "text-brand-primary" : theme === "light" ? "text-slate-400 group-hover:text-slate-700" : "text-zinc-500 group-hover:text-zinc-300"
+                          }`} />
+                          <span className="truncate">{tab.label}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
-              {[
-                { id: "staff", icon: Settings, label: "Security & Staff", locked: currentUser.role !== "CEO", labelBadge: "CEO Only" }
-              ].map((tab) => {
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => {
-                      if (tab.locked) {
-                        alert("The Security & Staff section requires root CEO permissions. Safety block active.");
-                        return;
-                      }
-                      setActiveTab(tab.id as any);
-                      setSearchTerm("");
-                      setStatusFilter("ALL");
-                    }}
-                    className={`w-full flex items-center justify-between p-3.5 rounded-xl border text-left font-bold text-xs uppercase tracking-wider transition-all cursor-pointer ${
-                      isActive
-                        ? "bg-brand-primary/10 border-brand-primary/40 text-brand-primary shadow-lg shadow-brand-primary/5"
-                        : theme === "light"
-                          ? "bg-transparent border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100"
-                          : "bg-transparent border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/30"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <tab.icon className={`w-4 h-4 ${isActive ? "text-brand-primary" : theme === "light" ? "text-slate-400" : "text-zinc-500"}`} />
-                      <span>{tab.label}</span>
-                    </div>
+              {["staff", "my_profile"].some(id => isTabPermitted(id, currentUser.role, currentUser.allowedTabs)) && (
+                <div className="space-y-1">
+                  <div className="px-2.5 flex items-center justify-between text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-zinc-500 mb-1.5">
+                    <span>Account & System</span>
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500/60" />
+                  </div>
 
-                    {tab.locked && (
-                      <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-widest shrink-0">
-                        {tab.labelBadge}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
+                  {[
+                    { id: "my_profile", icon: UserCheck, label: "My Profile" },
+                    { id: "staff", icon: Settings, label: "Security & Staff", locked: !isTabPermitted("staff", currentUser.role, currentUser.allowedTabs), labelBadge: "CEO" }
+                  ].filter(tab => isTabPermitted(tab.id, currentUser.role, currentUser.allowedTabs)).map((tab) => {
+                    const isActive = activeTab === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => {
+                          if (tab.locked) {
+                            alert("The Security & Staff section requires root CEO permissions. Safety block active.");
+                            return;
+                          }
+                          setActiveTab(tab.id as any);
+                          setSearchTerm("");
+                          setStatusFilter("ALL");
+                        }}
+                        className={`group relative w-full flex items-center justify-between px-3 py-1.5 rounded-lg border text-left font-bold text-[11px] tracking-wide transition-all duration-200 cursor-pointer ${
+                          isActive
+                            ? "bg-gradient-to-r from-brand-primary/20 via-brand-primary/10 to-transparent border-brand-primary/40 text-brand-primary shadow-xs font-extrabold translate-x-0.5"
+                            : theme === "light"
+                              ? "bg-transparent border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80"
+                              : "bg-transparent border-transparent text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/60"
+                        }`}
+                      >
+                        {isActive && (
+                          <span className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-brand-primary rounded-r-full shadow-sm shadow-brand-primary" />
+                        )}
+                        <div className="flex items-center gap-2 pl-0.5">
+                          <tab.icon className={`w-3.5 h-3.5 transition-transform group-hover:scale-110 ${
+                            isActive ? "text-brand-primary" : theme === "light" ? "text-slate-400 group-hover:text-slate-700" : "text-zinc-500 group-hover:text-zinc-300"
+                          }`} />
+                          <span className="truncate">{tab.label}</span>
+                        </div>
 
-              <div className="pt-4 border-t border-inherit my-4">
-                <span className={`text-[9px] font-black uppercase tracking-widest px-3 block mb-2 ${
-                  theme === "light" ? "text-slate-400" : "text-zinc-500"
-                }`}>
-                  External Actions
-                </span>
-                
-                {setView && (
+                        {tab.locked && (
+                          <span className="text-[8px] font-black px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-widest shrink-0">
+                            {tab.labelBadge}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {setView && (
+                <div className="pt-1">
                   <button
                     onClick={() => setView("home")}
-                    className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-left font-bold text-xs uppercase tracking-wider transition-all cursor-pointer ${
+                    className={`group w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-left font-bold text-[10px] uppercase tracking-wider transition-all duration-200 cursor-pointer ${
                       theme === "light"
-                        ? "text-slate-500 hover:text-slate-800 hover:bg-slate-100"
-                        : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/30"
+                        ? "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+                        : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
                     }`}
                   >
-                    <ArrowRight className="w-4 h-4 rotate-180" />
+                    <ArrowRight className="w-3.5 h-3.5 rotate-180 transition-transform group-hover:-translate-x-1" />
                     <span>Back to Main Site</span>
                   </button>
-                )}
-              </div>
+                </div>
+              )}
             </nav>
 
-            {/* Sidebar Bottom Part: Theme toggle and User profile badge */}
-            <div className="p-4 border-t border-inherit space-y-4">
-              {/* Theme toggle switch */}
-              <div className={`p-2 rounded-xl flex items-center justify-between border ${
-                theme === "light" ? "bg-slate-50 border-slate-150" : "bg-zinc-900/60 border-zinc-900"
+            {/* Pro Sidebar Bottom Compact User Card */}
+            <div className={`p-3 border-t transition-colors ${theme === "light" ? "border-slate-200 bg-slate-50/50" : "border-zinc-900 bg-zinc-950/80"}`}>
+              <div className={`p-2 rounded-xl border flex items-center justify-between gap-2 ${
+                theme === "light" ? "bg-white border-slate-200/80 shadow-xs" : "bg-zinc-900/70 border-zinc-800/80"
               }`}>
-                <span className={`text-[10px] font-black uppercase tracking-wider pl-2 ${
-                  theme === "light" ? "text-slate-500" : "text-zinc-400"
-                }`}>
-                  Theme: {theme}
-                </span>
+                {/* User Info */}
                 <button
                   type="button"
-                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                  className={`p-2 rounded-lg border flex items-center justify-center transition-all cursor-pointer ${
-                    theme === "light" ? "bg-white border-slate-250 text-amber-500 shadow-sm" : "bg-zinc-950 border-zinc-850 text-indigo-400"
-                  }`}
-                  title="Toggle Visual Theme"
+                  onClick={() => setActiveTab("my_profile")}
+                  className="flex items-center gap-2 min-w-0 text-left hover:opacity-80 transition-opacity cursor-pointer group"
+                  title="View My Profile"
                 >
-                  {theme === "dark" ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-                </button>
-              </div>
-
-              {/* User profile details */}
-              <div className={`p-3 rounded-xl border flex flex-col gap-2 ${
-                theme === "light" ? "bg-slate-50 border-slate-150" : "bg-zinc-900/40 border-zinc-900"
-              }`}>
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-brand-primary flex items-center justify-center text-white font-bold text-xs shadow-md">
-                    {currentUser.name.charAt(0).toUpperCase()}
+                  <div className="relative shrink-0">
+                    {currentUser.avatar ? (
+                      <img src={currentUser.avatar} alt={currentUser.name} className="w-7 h-7 rounded-lg object-cover border border-brand-primary/40 shadow-xs" referrerPolicy="no-referrer" />
+                    ) : (
+                      <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-brand-primary to-indigo-500 flex items-center justify-center text-white font-black text-[10px] shadow-xs">
+                        {currentUser.name.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-emerald-500 rounded-full ring-2 ring-zinc-950" />
                   </div>
-                  <div className="truncate flex-grow">
-                    <span className={`text-xs font-black block truncate ${theme === "light" ? "text-slate-900" : "text-white"}`}>
+                  <div className="truncate">
+                    <span className={`text-[11px] font-bold block truncate group-hover:text-brand-primary transition-colors ${theme === "light" ? "text-slate-900" : "text-white"}`}>
                       {currentUser.name}
                     </span>
-                    <span className="text-[9px] font-black uppercase text-brand-primary tracking-wider">
-                      {currentUser.role} Account
+                    <span className="text-[8px] font-black uppercase text-brand-primary tracking-widest block">
+                      {currentUser.role}
                     </span>
                   </div>
-                </div>
-                
-                {/* Logout action */}
-                <button
-                  onClick={handleLogout}
-                  className="w-full py-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 border border-red-500/20 cursor-pointer"
-                >
-                  <LogOut className="w-3.5 h-3.5" /> Logout
                 </button>
+
+                {/* Right Quick Controls */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                    className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                      theme === "light" 
+                        ? "bg-slate-100 border-slate-200 text-amber-600 hover:bg-slate-200" 
+                        : "bg-zinc-950 border-zinc-800 text-indigo-400 hover:bg-zinc-800"
+                    }`}
+                    title="Toggle Theme"
+                  >
+                    {theme === "dark" ? <Sun className="w-3 h-3" /> : <Moon className="w-3 h-3" />}
+                  </button>
+
+                  <button
+                    onClick={handleLogout}
+                    className="p-1.5 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-lg text-[10px] font-bold transition-all border border-red-500/20 cursor-pointer flex items-center justify-center"
+                    title="Sign Out"
+                  >
+                    <LogOut className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
             </div>
           </aside>
@@ -1543,8 +1999,8 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
           {/* MAIN PANE (Displaced to the right on desktop) */}
           <div className="flex-grow lg:pl-72 flex flex-col min-h-screen">
             
-            {/* TOP BAR / MOBILE NAVBAR */}
-            <header className={`px-6 py-4 border-b flex items-center justify-between transition-all duration-300 z-20 ${
+            {/* TOP BAR / HEADER */}
+            <header className={`px-6 py-3 border-b flex items-center justify-between transition-all duration-300 z-30 relative ${
               theme === "light" ? "bg-white border-slate-200" : "bg-zinc-950 border-zinc-900"
             }`}>
               {/* Left Title details */}
@@ -1560,50 +2016,148 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                 </button>
 
                 <div>
-                  <h2 className={`text-sm font-black uppercase tracking-wider ${theme === "light" ? "text-slate-900" : "text-white"}`}>
+                  <h2 className={`text-xs sm:text-sm font-black uppercase tracking-wider ${theme === "light" ? "text-slate-900" : "text-white"}`}>
                     Nexlify Admin <span className="text-brand-primary font-bold">Console</span>
                   </h2>
-                  <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Active Workspace Management</p>
+                  <p className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Workspace Management</p>
                 </div>
               </div>
 
-              {/* Right Status utilities */}
-              <div className="flex items-center gap-4">
-                {/* Quick theme toggle for smaller viewports */}
+              {/* Right Utilities: Theme & Functional Notifications Bell */}
+              <div className="flex items-center gap-3 relative">
+                {/* Theme toggle */}
                 <button
                   type="button"
                   onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                  className={`lg:hidden p-2 rounded-xl border flex items-center justify-center transition-all cursor-pointer ${
-                    theme === "light" ? "bg-white border-slate-200 text-amber-500 shadow-sm" : "bg-zinc-900 border-zinc-850 text-indigo-400"
+                  className={`p-2 rounded-xl border flex items-center justify-center transition-all cursor-pointer ${
+                    theme === "light" ? "bg-slate-50 border-slate-200 text-amber-600 hover:bg-slate-100 shadow-xs" : "bg-zinc-900 border-zinc-800 text-indigo-400 hover:bg-zinc-850"
                   }`}
+                  title="Toggle Visual Theme"
                 >
                   {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
                 </button>
 
-                {/* Database Connection Node */}
-                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border shadow-inner ${
-                  theme === "light" ? "bg-slate-50 border-slate-200" : "bg-zinc-900/80 border-zinc-850"
-                }`}>
-                  <Database className="w-3.5 h-3.5 text-zinc-400" />
-                  <span className={`hidden md:inline text-[9px] font-black tracking-wider uppercase ${
-                    theme === "light" ? "text-slate-500" : "text-zinc-400"
-                  }`}>Storage Node:</span>
-                  <span className="flex items-center gap-1">
-                    <span className={`w-1.5 h-1.5 rounded-full animate-ping ${dbStatus ? "bg-green-500" : "bg-amber-500"}`} />
-                    <span className={`text-[9px] font-black uppercase tracking-widest ${dbStatus ? "text-green-500" : "text-amber-500"}`}>
-                      {dbStatus ? "LIVE" : "SANDBOX"}
+                {/* Notifications Bell Icon Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowNotifications(!showNotifications)}
+                  className={`relative p-2 rounded-xl border flex items-center justify-center transition-all cursor-pointer ${
+                    showNotifications 
+                      ? "bg-brand-primary text-white border-brand-primary shadow-md shadow-brand-primary/20" 
+                      : theme === "light" 
+                        ? "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100" 
+                        : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-850"
+                  }`}
+                  aria-label="View Notifications"
+                >
+                  <Bell className="w-4 h-4" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-black flex items-center justify-center border-2 border-zinc-950 animate-pulse">
+                      {unreadCount}
                     </span>
-                  </span>
-                </div>
+                  )}
+                </button>
 
-                <div className="hidden sm:flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                  <span className={`text-[9px] font-black uppercase tracking-wider ${
-                    theme === "light" ? "text-slate-500" : "text-zinc-400"
-                  }`}>
-                    Authenticated
-                  </span>
-                </div>
+                {/* Notifications Dropdown Panel */}
+                <AnimatePresence>
+                  {showNotifications && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      transition={{ duration: 0.15 }}
+                      className={`absolute right-0 top-12 w-80 sm:w-96 rounded-2xl border shadow-2xl z-50 overflow-hidden ${
+                        theme === "light" 
+                          ? "bg-white border-slate-200 text-slate-800" 
+                          : "bg-zinc-950 border-zinc-800 text-zinc-100"
+                      }`}
+                    >
+                      {/* Header */}
+                      <div className={`p-3.5 border-b flex items-center justify-between ${
+                        theme === "light" ? "bg-slate-50 border-slate-200" : "bg-zinc-900/60 border-zinc-850"
+                      }`}>
+                        <div className="flex items-center gap-2">
+                          <Bell className="w-4 h-4 text-brand-primary" />
+                          <span className="text-xs font-black uppercase tracking-wider">Notifications</span>
+                          {unreadCount > 0 && (
+                            <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-brand-primary text-white">
+                              {unreadCount} new
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          {unreadCount > 0 && (
+                            <button
+                              onClick={() => {
+                                setReadNotifIds(allNotifications.map(n => n.id));
+                              }}
+                              className="text-[10px] font-bold text-brand-primary hover:underline flex items-center gap-1 px-2 py-1 cursor-pointer"
+                              title="Mark all as read"
+                            >
+                              <CheckCheck className="w-3 h-3" /> Mark read
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setShowNotifications(false)}
+                            className="p-1 text-zinc-400 hover:text-white rounded-lg cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* List */}
+                      <div className="max-h-80 overflow-y-auto divide-y divide-zinc-800/40 custom-scrollbar">
+                        {allNotifications.length === 0 ? (
+                          <div className="p-8 text-center space-y-2">
+                            <BellOff className="w-8 h-8 text-zinc-500 mx-auto opacity-60" />
+                            <p className="text-xs font-bold text-zinc-400">All caught up!</p>
+                            <p className="text-[10px] text-zinc-500">No new alerts or pending tasks requiring attention.</p>
+                          </div>
+                        ) : (
+                          allNotifications.map((notif) => (
+                            <div
+                              key={notif.id}
+                              onClick={() => {
+                                setReadNotifIds((prev) => [...prev, notif.id]);
+                                setActiveTab(notif.tab);
+                                setShowNotifications(false);
+                              }}
+                              className={`p-3 text-left transition-all cursor-pointer flex items-start gap-3 hover:bg-brand-primary/5 ${
+                                !notif.isRead 
+                                  ? theme === "light" ? "bg-brand-primary/5" : "bg-brand-primary/10" 
+                                  : "opacity-75"
+                              }`}
+                            >
+                              <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
+                                !notif.isRead ? "bg-brand-primary" : "bg-transparent"
+                              }`} />
+                              <div className="flex-grow min-w-0 space-y-0.5">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className={`text-xs font-bold truncate ${
+                                    theme === "light" ? "text-slate-900" : "text-white"
+                                  }`}>
+                                    {notif.title}
+                                  </span>
+                                  <span className="text-[9px] font-bold text-zinc-500 shrink-0">
+                                    {notif.time}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-zinc-400 truncate">
+                                  {notif.subtitle}
+                                </p>
+                                <span className="inline-block text-[8px] font-black uppercase tracking-widest text-brand-primary pt-0.5">
+                                  Go to {notif.type}s →
+                                </span>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </header>
 
@@ -1626,23 +2180,33 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                     exit={{ x: "-100%" }}
                     transition={{ type: "spring", damping: 25, stiffness: 200 }}
                     className={`fixed inset-y-0 left-0 w-72 z-50 flex flex-col lg:hidden border-r shadow-2xl transition-all duration-300 ${
-                      theme === "light" ? "bg-white border-slate-200 text-slate-800" : "bg-zinc-950 border-zinc-900 text-zinc-100"
-                    }`}
+                      theme === "light" ? "bg-white/95 border-slate-200 text-slate-800" : "bg-zinc-950/95 border-zinc-900 text-zinc-100"
+                    } backdrop-blur-xl`}
                   >
                     {/* Drawer Header */}
-                    <div className="p-6 border-b border-inherit flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0">
+                    <div className="p-5 border-b border-inherit flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="relative w-9 h-9 rounded-xl overflow-hidden border border-brand-primary/30 shadow-md shrink-0">
                           <img src="https://iili.io/Bp0LZ3Q.jpg" alt="Logo" className="w-full h-full object-cover" />
                         </div>
-                        <span className={`font-display font-black text-sm tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>
-                          Nexlify Admin
-                        </span>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className={`font-display font-black text-sm tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>
+                              Nexlify
+                            </span>
+                            <span className="text-[9px] font-black px-1.5 py-0.2 bg-brand-primary/10 text-brand-primary border border-brand-primary/20 rounded-md uppercase tracking-wider">
+                              ADMIN
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-extrabold uppercase text-zinc-500 tracking-wider block">
+                            Mobile Console
+                          </span>
+                        </div>
                       </div>
                       <button
                         onClick={() => setIsMobileMenuOpen(false)}
-                        className={`p-2 rounded-lg border cursor-pointer ${
-                          theme === "light" ? "bg-slate-50 border-slate-200" : "bg-zinc-900 border-zinc-850"
+                        className={`p-2 rounded-xl border transition-all cursor-pointer ${
+                          theme === "light" ? "bg-slate-50 border-slate-200 text-slate-600" : "bg-zinc-900 border-zinc-800 text-zinc-400"
                         }`}
                       >
                         <X className="w-4 h-4" />
@@ -1650,157 +2214,177 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                     </div>
 
                     {/* Drawer middle content */}
-                    <nav className="flex-grow p-4 space-y-1.5 overflow-y-auto">
-                      <span className={`text-[9px] font-black uppercase tracking-widest px-3 block mb-2 ${
-                        theme === "light" ? "text-slate-400" : "text-zinc-500"
-                      }`}>
-                        Management Console
-                      </span>
+                    <nav className="flex-grow p-3 space-y-4 overflow-y-auto custom-scrollbar">
+                      {["overview", "bookings", "messages", "careers"].some(id => isTabPermitted(id, currentUser.role, currentUser.allowedTabs)) && (
+                        <div className="space-y-1">
+                          <div className="px-2.5 flex items-center justify-between text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-zinc-500 mb-1.5">
+                            <span>Executive Hub</span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-brand-primary animate-pulse" />
+                          </div>
 
-                      {[
-                        { id: "bookings", icon: Calendar, label: "Bookings", count: consultations.length },
-                        { id: "messages", icon: MessageSquare, label: "Inbox", count: messages.filter(m => !m.read).length, countBadge: true },
-                        { id: "careers", icon: Users, label: "Applications", count: applications.filter(a => a.status === "Reviewing").length, countBadge: true }
-                      ].map((tab) => {
-                        const isActive = activeTab === tab.id;
-                        return (
-                          <button
-                            key={tab.id}
-                            onClick={() => {
-                              setActiveTab(tab.id as any);
-                              setSearchTerm("");
-                              setStatusFilter("ALL");
-                              setIsMobileMenuOpen(false);
-                            }}
-                            className={`w-full flex items-center justify-between p-3.5 rounded-xl border text-left font-bold text-xs uppercase tracking-wider transition-all cursor-pointer ${
-                              isActive
-                                ? "bg-brand-primary/10 border-brand-primary/40 text-brand-primary shadow-lg shadow-brand-primary/5"
-                                : theme === "light"
-                                  ? "bg-transparent border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100"
-                                  : "bg-transparent border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/30"
-                            }`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <tab.icon className={`w-4 h-4 ${isActive ? "text-brand-primary" : theme === "light" ? "text-slate-400" : "text-zinc-500"}`} />
-                              <span>{tab.label}</span>
-                            </div>
-
-                            {tab.count !== undefined && tab.count > 0 && (
-                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
-                                isActive 
-                                  ? "bg-brand-primary text-white" 
-                                  : tab.countBadge 
-                                    ? "bg-brand-primary/25 text-brand-primary border border-brand-primary/10" 
+                          {[
+                            { id: "overview", icon: LayoutDashboard, label: "Overview Page" },
+                            { id: "bookings", icon: Calendar, label: "Bookings", count: consultations.length },
+                            { id: "messages", icon: MessageSquare, label: "Inbox Messages", count: messages.filter(m => !m.read).length, countBadge: true },
+                            { id: "careers", icon: Users, label: "Job Applicants", count: applications.filter(a => a.status === "Reviewing").length, countBadge: true }
+                          ].filter(tab => isTabPermitted(tab.id, currentUser.role, currentUser.allowedTabs)).map((tab) => {
+                            const isActive = activeTab === tab.id;
+                            return (
+                              <button
+                                key={tab.id}
+                                onClick={() => {
+                                  setActiveTab(tab.id as any);
+                                  setSearchTerm("");
+                                  setStatusFilter("ALL");
+                                  setIsMobileMenuOpen(false);
+                                }}
+                                className={`group relative w-full flex items-center justify-between px-3 py-1.5 rounded-lg border text-left font-bold text-[11px] tracking-wide transition-all duration-200 cursor-pointer ${
+                                  isActive
+                                    ? "bg-gradient-to-r from-brand-primary/20 via-brand-primary/10 to-transparent border-brand-primary/40 text-brand-primary font-extrabold"
                                     : theme === "light"
-                                      ? "bg-slate-100 text-slate-600 border border-slate-200"
-                                      : "bg-zinc-900 text-zinc-400 border border-zinc-850"
-                              }`}>
-                                {tab.count}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
+                                      ? "bg-transparent border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80"
+                                      : "bg-transparent border-transparent text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/60"
+                                }`}
+                              >
+                                {isActive && (
+                                  <span className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-brand-primary rounded-r-full shadow-sm shadow-brand-primary" />
+                                )}
+                                <div className="flex items-center gap-2 pl-0.5">
+                                  <tab.icon className={`w-3.5 h-3.5 ${isActive ? "text-brand-primary" : theme === "light" ? "text-slate-400" : "text-zinc-500"}`} />
+                                  <span className="truncate">{tab.label}</span>
+                                </div>
 
-                      <span className={`text-[9px] font-black uppercase tracking-widest px-3 block mt-6 mb-2 ${
-                        theme === "light" ? "text-slate-400" : "text-zinc-500"
-                      }`}>
-                        Dynamic Site CMS
-                      </span>
+                                {tab.count !== undefined && tab.count > 0 && (
+                                  <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-black tracking-tight shrink-0 ${
+                                    isActive 
+                                      ? "bg-brand-primary text-white shadow-xs" 
+                                      : tab.countBadge 
+                                        ? "bg-brand-primary/20 text-brand-primary border border-brand-primary/30 animate-pulse" 
+                                        : theme === "light"
+                                          ? "bg-slate-100 text-slate-700 border border-slate-200"
+                                          : "bg-zinc-900 text-zinc-300 border border-zinc-800"
+                                  }`}>
+                                    {tab.count}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
 
-                      {[
-                        { id: "insights_cms", icon: BookOpen, label: "Publish Insights" },
-                        { id: "careers_cms", icon: Briefcase, label: "Publish Careers" },
-                        { id: "training_cms", icon: GraduationCap, label: "Edit Training" },
-                        { id: "about_cms", icon: Info, label: "Update About Page" },
-                        { id: "portfolio_cms", icon: Layout, label: "Update Portfolio" },
-                        { id: "services_cms", icon: Layers, label: "Update Services" }
-                      ].map((tab) => {
-                        const isActive = activeTab === tab.id;
-                        return (
-                          <button
-                            key={tab.id}
-                            onClick={() => {
-                              setActiveTab(tab.id as any);
-                              setSearchTerm("");
-                              setStatusFilter("ALL");
-                              setIsMobileMenuOpen(false);
-                            }}
-                            className={`w-full flex items-center justify-between p-3.5 rounded-xl border text-left font-bold text-xs uppercase tracking-wider transition-all cursor-pointer ${
-                              isActive
-                                ? "bg-brand-primary/10 border-brand-primary/40 text-brand-primary shadow-lg shadow-brand-primary/5"
-                                : theme === "light"
-                                  ? "bg-transparent border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100"
-                                  : "bg-transparent border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/30"
-                            }`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <tab.icon className={`w-4 h-4 ${isActive ? "text-brand-primary" : theme === "light" ? "text-slate-400" : "text-zinc-500"}`} />
-                              <span>{tab.label}</span>
-                            </div>
-                          </button>
-                        );
-                      })}
+                      {["insights_cms", "careers_cms", "training_cms", "about_cms", "portfolio_cms", "services_cms"].some(id => isTabPermitted(id, currentUser.role, currentUser.allowedTabs)) && (
+                        <div className="space-y-1">
+                          <div className="px-2.5 flex items-center justify-between text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-zinc-500 mb-1.5">
+                            <span>Content & Publishing</span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-cyan-500/60" />
+                          </div>
 
-                      <span className={`text-[9px] font-black uppercase tracking-widest px-3 block mt-6 mb-2 ${
-                        theme === "light" ? "text-slate-400" : "text-zinc-500"
-                      }`}>
-                        Security & Staff
-                      </span>
+                          {[
+                            { id: "insights_cms", icon: BookOpen, label: "Publish Insights" },
+                            { id: "careers_cms", icon: Briefcase, label: "Publish Careers" },
+                            { id: "training_cms", icon: GraduationCap, label: "Edit Training" },
+                            { id: "about_cms", icon: Info, label: "Update About Page" },
+                            { id: "portfolio_cms", icon: Layout, label: "Update Portfolio" },
+                            { id: "services_cms", icon: Layers, label: "Update Services" }
+                          ].filter(tab => isTabPermitted(tab.id, currentUser.role, currentUser.allowedTabs)).map((tab) => {
+                            const isActive = activeTab === tab.id;
+                            return (
+                              <button
+                                key={tab.id}
+                                onClick={() => {
+                                  setActiveTab(tab.id as any);
+                                  setSearchTerm("");
+                                  setStatusFilter("ALL");
+                                  setIsMobileMenuOpen(false);
+                                }}
+                                className={`group relative w-full flex items-center justify-between px-3 py-1.5 rounded-lg border text-left font-bold text-[11px] tracking-wide transition-all duration-200 cursor-pointer ${
+                                  isActive
+                                    ? "bg-gradient-to-r from-brand-primary/20 via-brand-primary/10 to-transparent border-brand-primary/40 text-brand-primary font-extrabold"
+                                    : theme === "light"
+                                      ? "bg-transparent border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80"
+                                      : "bg-transparent border-transparent text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/60"
+                                }`}
+                              >
+                                {isActive && (
+                                  <span className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-brand-primary rounded-r-full shadow-sm shadow-brand-primary" />
+                                )}
+                                <div className="flex items-center gap-2 pl-0.5">
+                                  <tab.icon className={`w-3.5 h-3.5 ${isActive ? "text-brand-primary" : theme === "light" ? "text-slate-400" : "text-zinc-500"}`} />
+                                  <span className="truncate">{tab.label}</span>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
 
-                      {[
-                        { id: "staff", icon: Settings, label: "Security & Staff", locked: currentUser.role !== "CEO", labelBadge: "CEO Only" }
-                      ].map((tab) => {
-                        const isActive = activeTab === tab.id;
-                        return (
-                          <button
-                            key={tab.id}
-                            onClick={() => {
-                              if (tab.locked) {
-                                alert("The Security & Staff section requires root CEO permissions. Safety block active.");
-                                return;
-                              }
-                              setActiveTab(tab.id as any);
-                              setSearchTerm("");
-                              setStatusFilter("ALL");
-                              setIsMobileMenuOpen(false);
-                            }}
-                            className={`w-full flex items-center justify-between p-3.5 rounded-xl border text-left font-bold text-xs uppercase tracking-wider transition-all cursor-pointer ${
-                              isActive
-                                ? "bg-brand-primary/10 border-brand-primary/40 text-brand-primary shadow-lg shadow-brand-primary/5"
-                                : theme === "light"
-                                  ? "bg-transparent border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-100"
-                                  : "bg-transparent border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/30"
-                            }`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <tab.icon className={`w-4 h-4 ${isActive ? "text-brand-primary" : theme === "light" ? "text-slate-400" : "text-zinc-500"}`} />
-                              <span>{tab.label}</span>
-                            </div>
+                      {["staff", "my_profile"].some(id => isTabPermitted(id, currentUser.role, currentUser.allowedTabs)) && (
+                        <div className="space-y-1">
+                          <div className="px-2.5 flex items-center justify-between text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-zinc-500 mb-1.5">
+                            <span>Account & System</span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500/60" />
+                          </div>
 
-                            {tab.locked && (
-                              <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-widest shrink-0">
-                                {tab.labelBadge}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
+                          {[
+                            { id: "my_profile", icon: UserCheck, label: "My Profile" },
+                            { id: "staff", icon: Settings, label: "Security & Staff", locked: !isTabPermitted("staff", currentUser.role, currentUser.allowedTabs), labelBadge: "CEO" }
+                          ].filter(tab => isTabPermitted(tab.id, currentUser.role, currentUser.allowedTabs)).map((tab) => {
+                            const isActive = activeTab === tab.id;
+                            return (
+                              <button
+                                key={tab.id}
+                                onClick={() => {
+                                  if (tab.locked) {
+                                    alert("The Security & Staff section requires root CEO permissions. Safety block active.");
+                                    return;
+                                  }
+                                  setActiveTab(tab.id as any);
+                                  setSearchTerm("");
+                                  setStatusFilter("ALL");
+                                  setIsMobileMenuOpen(false);
+                                }}
+                                className={`group relative w-full flex items-center justify-between px-3 py-1.5 rounded-lg border text-left font-bold text-[11px] tracking-wide transition-all duration-200 cursor-pointer ${
+                                  isActive
+                                    ? "bg-gradient-to-r from-brand-primary/20 via-brand-primary/10 to-transparent border-brand-primary/40 text-brand-primary font-extrabold"
+                                    : theme === "light"
+                                      ? "bg-transparent border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-100/80"
+                                      : "bg-transparent border-transparent text-zinc-400 hover:text-zinc-100 hover:bg-zinc-900/60"
+                                }`}
+                              >
+                                {isActive && (
+                                  <span className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-brand-primary rounded-r-full shadow-sm shadow-brand-primary" />
+                                )}
+                                <div className="flex items-center gap-2 pl-0.5">
+                                  <tab.icon className={`w-3.5 h-3.5 ${isActive ? "text-brand-primary" : theme === "light" ? "text-slate-400" : "text-zinc-500"}`} />
+                                  <span className="truncate">{tab.label}</span>
+                                </div>
+
+                                {tab.locked && (
+                                  <span className="text-[8px] font-black px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-widest shrink-0">
+                                    {tab.labelBadge}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
 
                       {setView && (
-                        <div className="pt-4 border-t border-inherit mt-4">
+                        <div className="pt-1">
                           <button
                             onClick={() => {
                               setView("home");
                               setIsMobileMenuOpen(false);
                             }}
-                            className={`w-full flex items-center gap-3 p-3.5 rounded-xl text-left font-bold text-xs uppercase tracking-wider transition-all cursor-pointer ${
+                            className={`group w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-left font-bold text-[10px] uppercase tracking-wider transition-all duration-200 cursor-pointer ${
                               theme === "light"
-                                ? "text-slate-500 hover:text-slate-800 hover:bg-slate-100"
-                                : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/30"
+                                ? "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+                                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/60"
                             }`}
                           >
-                            <ArrowRight className="w-4 h-4 rotate-180" />
+                            <ArrowRight className="w-3.5 h-3.5 rotate-180" />
                             <span>Back to Main Site</span>
                           </button>
                         </div>
@@ -1808,29 +2392,49 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                     </nav>
 
                     {/* Drawer bottom content */}
-                    <div className="p-4 border-t border-inherit space-y-4">
-                      <div className={`p-3 rounded-xl border flex flex-col gap-2 ${
-                        theme === "light" ? "bg-slate-50 border-slate-150" : "bg-zinc-900/40 border-zinc-900"
+                    <div className={`p-3 border-t transition-colors ${theme === "light" ? "border-slate-200 bg-slate-50/50" : "border-zinc-900 bg-zinc-950/80"}`}>
+                      <div className={`p-2 rounded-xl border flex items-center justify-between gap-2 ${
+                        theme === "light" ? "bg-white border-slate-200/80 shadow-xs" : "bg-zinc-900/70 border-zinc-800/80"
                       }`}>
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-brand-primary flex items-center justify-center text-white font-bold text-xs shadow-md">
-                            {currentUser.name.charAt(0).toUpperCase()}
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="relative shrink-0">
+                            <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-brand-primary to-indigo-500 flex items-center justify-center text-white font-black text-[10px] shadow-xs">
+                              {currentUser.name.charAt(0).toUpperCase()}
+                            </div>
+                            <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-emerald-500 rounded-full ring-2 ring-zinc-950" />
                           </div>
-                          <div className="truncate flex-grow">
-                            <span className={`text-xs font-black block truncate ${theme === "light" ? "text-slate-900" : "text-white"}`}>
+                          <div className="truncate">
+                            <span className={`text-[11px] font-bold block truncate ${theme === "light" ? "text-slate-900" : "text-white"}`}>
                               {currentUser.name}
                             </span>
-                            <span className="text-[9px] font-black uppercase text-brand-primary tracking-wider">
-                              {currentUser.role} Account
+                            <span className="text-[8px] font-black uppercase text-brand-primary tracking-widest block">
+                              {currentUser.role}
                             </span>
                           </div>
                         </div>
-                        <button
-                          onClick={handleLogout}
-                          className="w-full py-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 border border-red-500/20 cursor-pointer"
-                        >
-                          <LogOut className="w-3.5 h-3.5" /> Logout
-                        </button>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                            className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                              theme === "light" 
+                                ? "bg-slate-100 border-slate-200 text-amber-600 hover:bg-slate-200" 
+                                : "bg-zinc-950 border-zinc-800 text-indigo-400 hover:bg-zinc-800"
+                            }`}
+                            title="Toggle Theme"
+                          >
+                            {theme === "dark" ? <Sun className="w-3 h-3" /> : <Moon className="w-3 h-3" />}
+                          </button>
+
+                          <button
+                            onClick={handleLogout}
+                            className="p-1.5 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-lg text-[10px] font-bold transition-all border border-red-500/20 cursor-pointer flex items-center justify-center"
+                            title="Sign Out"
+                          >
+                            <LogOut className="w-3 h-3" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </motion.aside>
@@ -1841,85 +2445,231 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
             {/* MAIN WORKSPACE WRAPPER (Scrollable core) */}
             <main className="flex-grow p-6 md:p-8 space-y-8 overflow-y-auto">
               
-              {/* ANALYTICS BENTO BOARD GRID */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                
-                <div className={`p-4 sm:p-5 border rounded-2xl relative overflow-hidden flex flex-col justify-between transition-all ${
-                  theme === "light" ? "bg-white border-slate-200/80 shadow-sm" : "bg-zinc-900/40 border-zinc-850 shadow-xl"
-                }`}>
-                  <div className="absolute top-0 right-0 w-20 h-20 bg-brand-primary/5 rounded-full blur-xl pointer-events-none" />
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Total Bookings</span>
-                    <Calendar className="w-4 h-4 text-brand-primary" />
+              {/* OVERVIEW PAGE CONTENT */}
+              {activeTab === "overview" && (
+                <div className="space-y-8">
+                  {/* Executive Overview Header */}
+                  <div className={`p-6 sm:p-8 rounded-3xl border relative overflow-hidden transition-all ${
+                    theme === "light" 
+                      ? "bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 text-white border-slate-800 shadow-xl" 
+                      : "bg-gradient-to-r from-zinc-900 via-zinc-900 to-zinc-950 text-white border-zinc-800/80 shadow-2xl"
+                  }`}>
+                    <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 bg-brand-primary/20 rounded-full blur-3xl pointer-events-none" />
+                    <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                      <div>
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="px-3 py-1 rounded-full bg-brand-primary/20 text-brand-primary text-[10px] font-black uppercase tracking-widest border border-brand-primary/30 flex items-center gap-1.5">
+                            <Sparkles className="w-3 h-3" /> System Overview
+                          </span>
+                          <span className={`text-xs font-mono px-2.5 py-0.5 rounded-full border ${
+                            dbStatus 
+                              ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" 
+                              : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                          }`}>
+                            {dbStatus ? "• DB Connected" : "• Local Mode"}
+                          </span>
+                        </div>
+                        <h2 className="text-2xl sm:text-3xl font-black tracking-tight font-display">
+                          Welcome back, {currentUser.name}
+                        </h2>
+                        <p className="text-xs text-zinc-400 mt-1 max-w-xl font-medium leading-relaxed">
+                          Central executive console summarizing consultation bookings, direct client inquiries, recruitment pipelines, and publishing metrics.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3 relative z-10 shrink-0">
+                        <button
+                          onClick={() => setActiveTab("bookings")}
+                          className="px-4 py-2.5 rounded-xl bg-brand-primary hover:bg-brand-primary/90 text-white font-bold text-xs transition-all shadow-md shadow-brand-primary/20 cursor-pointer flex items-center gap-2"
+                        >
+                          <Calendar className="w-4 h-4" />
+                          <span>View Bookings</span>
+                        </button>
+                        <button
+                          onClick={() => setActiveTab("messages")}
+                          className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs transition-all backdrop-blur-md cursor-pointer flex items-center gap-2 border border-white/10"
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                          <span>Check Inbox</span>
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <span className={`text-2xl sm:text-3xl font-black block tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>
-                      {dataLoading ? "..." : consultations.length}
-                    </span>
-                    <span className="text-[10px] text-zinc-500 font-bold block mt-1 uppercase tracking-wider">
-                      {consultations.filter(c => c.status === "Pending").length} Pending approval
-                    </span>
+
+                  {/* ANALYTICS BENTO BOARD METRIC CONTAINERS */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    
+                    <div className={`p-4 sm:p-5 border rounded-2xl relative overflow-hidden flex flex-col justify-between transition-all ${
+                      theme === "light" ? "bg-white border-slate-200/80 shadow-sm" : "bg-zinc-900/40 border-zinc-850 shadow-xl"
+                    }`}>
+                      <div className="absolute top-0 right-0 w-20 h-20 bg-brand-primary/5 rounded-full blur-xl pointer-events-none" />
+                      <div className="flex items-center justify-between mb-4">
+                        <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Total Bookings</span>
+                        <Calendar className="w-4 h-4 text-brand-primary" />
+                      </div>
+                      <div>
+                        <span className={`text-2xl sm:text-3xl font-black block tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>
+                          {dataLoading ? "..." : consultations.length}
+                        </span>
+                        <span className="text-[10px] text-zinc-500 font-bold block mt-1 uppercase tracking-wider">
+                          {consultations.filter(c => c.status === "Pending").length} Pending approval
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className={`p-4 sm:p-5 border rounded-2xl relative overflow-hidden flex flex-col justify-between transition-all ${
+                      theme === "light" ? "bg-white border-slate-200/80 shadow-sm" : "bg-zinc-900/40 border-zinc-850 shadow-xl"
+                    }`}>
+                      <div className="absolute top-0 right-0 w-20 h-20 bg-brand-secondary/5 rounded-full blur-xl pointer-events-none" />
+                      <div className="flex items-center justify-between mb-4">
+                        <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Direct Messages</span>
+                        <MessageSquare className="w-4 h-4 text-brand-secondary" />
+                      </div>
+                      <div>
+                        <span className={`text-2xl sm:text-3xl font-black block tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>
+                          {dataLoading ? "..." : messages.length}
+                        </span>
+                        <span className="text-[10px] text-zinc-500 font-bold block mt-1 uppercase tracking-wider">
+                          {messages.filter(m => !m.read).length} Unread inquiries
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className={`p-4 sm:p-5 border rounded-2xl relative overflow-hidden flex flex-col justify-between transition-all ${
+                      theme === "light" ? "bg-white border-slate-200/80 shadow-sm" : "bg-zinc-900/40 border-zinc-850 shadow-xl"
+                    }`}>
+                      <div className="absolute top-0 right-0 w-20 h-20 bg-green-500/5 rounded-full blur-xl pointer-events-none" />
+                      <div className="flex items-center justify-between mb-4">
+                        <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Job Applicants</span>
+                        <Briefcase className="w-4 h-4 text-green-500" />
+                      </div>
+                      <div>
+                        <span className={`text-2xl sm:text-3xl font-black block tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>
+                          {dataLoading ? "..." : applications.length}
+                        </span>
+                        <span className="text-[10px] text-zinc-500 font-bold block mt-1 uppercase tracking-wider">
+                          {applications.filter(a => a.status === "Shortlisted").length} Shortlisted devs
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className={`p-4 sm:p-5 border rounded-2xl relative overflow-hidden flex flex-col justify-between transition-all ${
+                      theme === "light" ? "bg-white border-slate-200/80 shadow-sm" : "bg-zinc-900/40 border-zinc-850 shadow-xl"
+                    }`}>
+                      <div className="absolute top-0 right-0 w-20 h-20 bg-brand-primary/5 rounded-full blur-xl pointer-events-none" />
+                      <div className="flex items-center justify-between mb-4">
+                        <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Conversion Rate</span>
+                        <TrendingUp className="w-4 h-4 text-brand-primary" />
+                      </div>
+                      <div>
+                        <span className={`text-2xl sm:text-3xl font-black block tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>
+                          {consultations.length > 0 
+                            ? `${Math.round((consultations.filter(c => c.status === "Completed" || c.status === "Approved").length / consultations.length) * 100)}%`
+                            : "0%"
+                          }
+                        </span>
+                        <span className="text-[10px] text-zinc-500 font-bold block mt-1 uppercase tracking-wider">
+                          Ratio of active clients
+                        </span>
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* OVERVIEW RECENT ACTIVITY PANELS */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Recent Bookings Panel */}
+                    <div className={`p-6 border rounded-3xl space-y-4 ${
+                      theme === "light" ? "bg-white border-slate-200/80 shadow-sm" : "bg-zinc-900/40 border-zinc-850"
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-brand-primary" />
+                          <h3 className={`font-black text-sm tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>Recent Consultation Requests</h3>
+                        </div>
+                        <button 
+                          onClick={() => setActiveTab("bookings")}
+                          className="text-[11px] font-bold text-brand-primary hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <span>Manage</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </button>
+                      </div>
+
+                      <div className="space-y-3">
+                        {consultations.slice(0, 4).map((c) => (
+                          <div key={c.id} className={`p-3.5 border rounded-2xl flex items-center justify-between gap-3 ${
+                            theme === "light" ? "bg-slate-50/80 border-slate-200/60" : "bg-zinc-900/60 border-zinc-800/80"
+                          }`}>
+                            <div className="truncate min-w-0">
+                              <span className={`font-bold text-xs block truncate ${theme === "light" ? "text-slate-900" : "text-white"}`}>
+                                {c.name}
+                              </span>
+                              <span className="text-[10px] text-zinc-500 font-medium block truncate">
+                                {c.service || "General Inquiry"} • {c.email}
+                              </span>
+                            </div>
+                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 ${
+                              c.status === "Pending" ? "bg-amber-500/10 text-amber-500 border border-amber-500/20" :
+                              c.status === "Approved" ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" :
+                              "bg-zinc-500/10 text-zinc-500 border border-zinc-500/20"
+                            }`}>
+                              {c.status}
+                            </span>
+                          </div>
+                        ))}
+                        {consultations.length === 0 && (
+                          <p className="text-xs text-zinc-500 italic py-6 text-center">No consultation requests recorded yet.</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Latest Inbox Messages Panel */}
+                    <div className={`p-6 border rounded-3xl space-y-4 ${
+                      theme === "light" ? "bg-white border-slate-200/80 shadow-sm" : "bg-zinc-900/40 border-zinc-850"
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <MessageSquare className="w-4 h-4 text-brand-secondary" />
+                          <h3 className={`font-black text-sm tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>Latest Inbox Messages</h3>
+                        </div>
+                        <button 
+                          onClick={() => setActiveTab("messages")}
+                          className="text-[11px] font-bold text-brand-secondary hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <span>Manage</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </button>
+                      </div>
+
+                      <div className="space-y-3">
+                        {messages.slice(0, 4).map((m) => (
+                          <div key={m.id} className={`p-3.5 border rounded-2xl flex items-center justify-between gap-3 ${
+                            theme === "light" ? "bg-slate-50/80 border-slate-200/60" : "bg-zinc-900/60 border-zinc-800/80"
+                          }`}>
+                            <div className="truncate min-w-0">
+                              <span className={`font-bold text-xs block truncate ${theme === "light" ? "text-slate-900" : "text-white"}`}>
+                                {m.name}
+                              </span>
+                              <span className="text-[10px] text-zinc-500 font-medium block truncate">
+                                {m.subject || m.message}
+                              </span>
+                            </div>
+                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 ${
+                              !m.read ? "bg-brand-primary/10 text-brand-primary border border-brand-primary/20 animate-pulse" : "bg-zinc-500/10 text-zinc-500"
+                            }`}>
+                              {!m.read ? "New" : "Read"}
+                            </span>
+                          </div>
+                        ))}
+                        {messages.length === 0 && (
+                          <p className="text-xs text-zinc-500 italic py-6 text-center">No messages in inbox.</p>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
-
-                <div className={`p-4 sm:p-5 border rounded-2xl relative overflow-hidden flex flex-col justify-between transition-all ${
-                  theme === "light" ? "bg-white border-slate-200/80 shadow-sm" : "bg-zinc-900/40 border-zinc-850 shadow-xl"
-                }`}>
-                  <div className="absolute top-0 right-0 w-20 h-20 bg-brand-secondary/5 rounded-full blur-xl pointer-events-none" />
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Direct Messages</span>
-                    <MessageSquare className="w-4 h-4 text-brand-secondary" />
-                  </div>
-                  <div>
-                    <span className={`text-2xl sm:text-3xl font-black block tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>
-                      {dataLoading ? "..." : messages.length}
-                    </span>
-                    <span className="text-[10px] text-zinc-500 font-bold block mt-1 uppercase tracking-wider">
-                      {messages.filter(m => !m.read).length} Unread inquiries
-                    </span>
-                  </div>
-                </div>
-
-                <div className={`p-4 sm:p-5 border rounded-2xl relative overflow-hidden flex flex-col justify-between transition-all ${
-                  theme === "light" ? "bg-white border-slate-200/80 shadow-sm" : "bg-zinc-900/40 border-zinc-850 shadow-xl"
-                }`}>
-                  <div className="absolute top-0 right-0 w-20 h-20 bg-green-500/5 rounded-full blur-xl pointer-events-none" />
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Job Applicants</span>
-                    <Briefcase className="w-4 h-4 text-green-500" />
-                  </div>
-                  <div>
-                    <span className={`text-2xl sm:text-3xl font-black block tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>
-                      {dataLoading ? "..." : applications.length}
-                    </span>
-                    <span className="text-[10px] text-zinc-500 font-bold block mt-1 uppercase tracking-wider">
-                      {applications.filter(a => a.status === "Shortlisted").length} Shortlisted devs
-                    </span>
-                  </div>
-                </div>
-
-                <div className={`p-4 sm:p-5 border rounded-2xl relative overflow-hidden flex flex-col justify-between transition-all ${
-                  theme === "light" ? "bg-white border-slate-200/80 shadow-sm" : "bg-zinc-900/40 border-zinc-850 shadow-xl"
-                }`}>
-                  <div className="absolute top-0 right-0 w-20 h-20 bg-brand-primary/5 rounded-full blur-xl pointer-events-none" />
-                  <div className="flex items-center justify-between mb-4">
-                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Conversion Rate</span>
-                    <TrendingUp className="w-4 h-4 text-brand-primary" />
-                  </div>
-                  <div>
-                    <span className={`text-2xl sm:text-3xl font-black block tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>
-                      {consultations.length > 0 
-                        ? `${Math.round((consultations.filter(c => c.status === "Completed" || c.status === "Approved").length / consultations.length) * 100)}%`
-                        : "0%"
-                      }
-                    </span>
-                    <span className="text-[10px] text-zinc-500 font-bold block mt-1 uppercase tracking-wider">
-                      Ratio of active clients
-                    </span>
-                  </div>
-                </div>
-
-              </div>
+              )}
 
               {/* MAIN DATA INTERFACE MODULE */}
               <div className="space-y-6">
@@ -2352,176 +3102,647 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                         </div>
                       ) : (
                         /* ACTIVE ROSTER MANAGEMENT */
-                        <div className="space-y-6">
+                        <div className="space-y-8 animate-fade-in">
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-inherit">
+                            <div>
+                              <h3 className={`font-black text-xl tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>Security & Staff Workspace</h3>
+                              <p className={`text-xs ${theme === "light" ? "text-slate-500" : "text-zinc-500"}`}>Manage staff user roles, privileges, and provision new administrator profiles.</p>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setNewStaffError("");
+                                setNewStaffSuccess("");
+                                setShowStaffForm(true);
+                              }}
+                              className="px-4 py-2.5 bg-brand-primary text-white text-xs font-bold uppercase tracking-wider rounded-xl hover:bg-brand-primary/90 shadow-md transition-all cursor-pointer flex items-center gap-2"
+                            >
+                              <UserPlus className="w-4 h-4" />
+                              <span>Provision New Staff</span>
+                            </button>
+                          </div>
                           
                           {/* ROSTER LISTING */}
                           <div className={`p-6 border rounded-3xl space-y-4 ${
                             theme === "light" ? "bg-white border-slate-200" : "bg-zinc-900/30 border-zinc-850"
                           }`}>
-                            <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block">Active Administration Roster</span>
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block">Active Administration Roster ({staffList.length})</span>
+                              <span className="text-[10px] font-bold text-brand-primary">Click 'Access Scope' to view what each account can access</span>
+                            </div>
                             
                             <div className={`divide-y ${theme === "light" ? "divide-slate-150" : "divide-zinc-850"}`}>
                               {staffList.map((staff) => {
                                 const isSelf = staff.email.toLowerCase() === currentUser.email.toLowerCase();
+                                const isExpanded = expandedRosterEmails.includes(staff.email.toLowerCase());
+                                const permittedMods = ALL_SYSTEM_MODULES.filter(m => isTabPermitted(m.id, staff.role, staff.allowedTabs));
+                                const roleDetail = ROLE_PERMISSIONS_GUIDE[staff.role] || ROLE_PERMISSIONS_GUIDE["Employee"];
+
                                 return (
-                                  <div key={staff.id} className="py-4 flex items-center justify-between gap-4 first:pt-0 last:pb-0">
-                                    <div>
-                                      <h5 className={`font-bold text-xs sm:text-sm ${theme === "light" ? "text-slate-900" : "text-white"}`}>
-                                        {staff.name} 
-                                        {isSelf && <span className="text-[9px] font-bold text-brand-primary px-1.5 py-0.5 bg-brand-primary/10 rounded tracking-widest uppercase ml-1.5">You</span>}
-                                      </h5>
-                                      <span className={`text-[10px] font-semibold ${theme === "light" ? "text-slate-500" : "text-zinc-500"}`}>{staff.email}</span>
+                                  <div key={staff.id} className="py-4 space-y-3 first:pt-0 last:pb-0">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                      <div>
+                                        <h5 className={`font-bold text-xs sm:text-sm flex items-center gap-1.5 ${theme === "light" ? "text-slate-900" : "text-white"}`}>
+                                          {staff.name} 
+                                          {isSelf && <span className="text-[9px] font-bold text-brand-primary px-1.5 py-0.5 bg-brand-primary/10 rounded tracking-widest uppercase">You</span>}
+                                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase ${
+                                            staff.role === "CEO" 
+                                              ? "bg-brand-primary/10 text-brand-primary border border-brand-primary/20"
+                                              : staff.role === "Manager"
+                                                ? "bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                                                : staff.role === "Developer"
+                                                  ? "bg-blue-500/10 text-blue-500 border border-blue-500/20"
+                                                  : staff.role === "Designer"
+                                                    ? "bg-purple-500/10 text-purple-500 border border-purple-500/20"
+                                                    : staff.role === "Content Editor"
+                                                      ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                                                      : staff.role === "Customer Support"
+                                                        ? "bg-cyan-500/10 text-cyan-500 border border-cyan-500/20"
+                                                        : "bg-slate-500/10 text-slate-500 border border-slate-500/20"
+                                          }`}>
+                                            {staff.role}
+                                          </span>
+                                        </h5>
+                                        <span className={`text-[10px] font-semibold ${theme === "light" ? "text-slate-500" : "text-zinc-500"}`}>{staff.email}</span>
+                                      </div>
+
+                                      <div className="flex items-center gap-2">
+                                        {/* Toggle Scope Button */}
+                                        <button
+                                          onClick={() => {
+                                            const lower = staff.email.toLowerCase();
+                                            setExpandedRosterEmails(prev => 
+                                              prev.includes(lower) ? prev.filter(e => e !== lower) : [...prev, lower]
+                                            );
+                                          }}
+                                          className={`px-2.5 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider border cursor-pointer transition-all flex items-center gap-1 ${
+                                            isExpanded
+                                              ? "bg-brand-primary text-white border-brand-primary shadow-xs"
+                                              : theme === "light"
+                                                ? "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200"
+                                                : "bg-zinc-950 border-zinc-800 text-zinc-300 hover:bg-zinc-850"
+                                          }`}
+                                        >
+                                          <ShieldCheck className="w-3 h-3 text-brand-primary" />
+                                          <span>Access Scope ({permittedMods.length})</span>
+                                          {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                        </button>
+
+                                        {/* Role Dropdown */}
+                                        <select
+                                          value={staff.role}
+                                          onChange={(e) => handleUpdateStaffRole(staff.email, e.target.value as StaffUser["role"])}
+                                          disabled={isSelf}
+                                          className={`px-2.5 py-1.5 rounded-xl text-[10px] font-bold uppercase tracking-wider focus:outline-none border cursor-pointer transition-all ${
+                                            isSelf 
+                                              ? theme === "light"
+                                                ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                                                : "bg-zinc-950 text-zinc-600 border-zinc-900 cursor-not-allowed" 
+                                              : theme === "light"
+                                                ? "bg-white hover:bg-slate-550/10 text-brand-primary border-brand-primary/25 shadow-sm"
+                                                : "bg-zinc-900 hover:bg-zinc-850 text-brand-primary border-brand-primary/20"
+                                          }`}
+                                        >
+                                          <option value="CEO">CEO</option>
+                                          <option value="Manager">Manager</option>
+                                          <option value="Developer">Developer</option>
+                                          <option value="Designer">Designer</option>
+                                          <option value="Content Editor">Editor</option>
+                                          <option value="Customer Support">Customer Support</option>
+                                          <option value="Employee">Employee</option>
+                                        </select>
+
+                                        {/* Delete Staff Member Button */}
+                                        <button
+                                          onClick={() => handleDeleteStaffUser(staff.email)}
+                                          disabled={isSelf}
+                                          className={`p-1.5 rounded-lg border transition-all ${
+                                            isSelf
+                                              ? "opacity-30 cursor-not-allowed border-zinc-800 text-zinc-500"
+                                              : theme === "light"
+                                                ? "bg-slate-50 border-slate-200 hover:bg-red-50 text-slate-400 hover:text-red-500 hover:border-red-200 cursor-pointer"
+                                                : "bg-zinc-950 border-zinc-850 hover:bg-red-500/10 text-zinc-500 hover:text-red-400 hover:border-red-500/20 cursor-pointer"
+                                          }`}
+                                          title={isSelf ? "You cannot delete your own CEO account." : "Delete Staff Profile"}
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
                                     </div>
 
-                                    <div className="flex items-center gap-3">
-                                      <button
-                                        onClick={() => handleToggleStaffRole(staff.email, staff.role)}
-                                        disabled={isSelf}
-                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider focus:outline-none border transition-all ${
-                                          isSelf 
-                                            ? theme === "light"
-                                              ? "bg-slate-100 text-slate-300 border-slate-150 cursor-not-allowed"
-                                              : "bg-zinc-950 text-zinc-600 border-zinc-900 cursor-not-allowed" 
-                                            : theme === "light"
-                                              ? "bg-white hover:bg-slate-550/10 text-brand-primary border-brand-primary/25 cursor-pointer shadow-sm"
-                                              : "bg-zinc-900 hover:bg-zinc-850 text-brand-primary border-brand-primary/20 cursor-pointer"
+                                    {/* EXPANDABLE ACCESS SCOPE DRAWER */}
+                                    {isExpanded && (
+                                      <motion.div
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: "auto" }}
+                                        exit={{ opacity: 0, height: 0 }}
+                                        className={`p-4 rounded-2xl border space-y-3 ${
+                                          theme === "light" ? "bg-slate-50/80 border-slate-200" : "bg-zinc-950/80 border-zinc-800"
                                         }`}
                                       >
-                                        Role: {staff.role}
-                                      </button>
-                                    </div>
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-[10px] font-black uppercase tracking-wider text-brand-primary">
+                                              Assigned Role Authority Scope: {staff.role}
+                                            </span>
+                                            <span className={`text-[8px] font-black px-2 py-0.2 rounded-full border uppercase tracking-wider ${roleDetail.badgeClass}`}>
+                                              {roleDetail.securityLevel}
+                                            </span>
+                                          </div>
+                                          <span className="text-[9px] font-bold text-zinc-500">{permittedMods.length} of {ALL_SYSTEM_MODULES.length} modules accessible</span>
+                                        </div>
+
+                                        <p className={`text-[11px] font-medium leading-relaxed ${theme === "light" ? "text-slate-600" : "text-zinc-400"}`}>
+                                          {roleDetail.summary}
+                                        </p>
+
+                                        <div className="flex items-center justify-between border-t border-inherit pt-2.5 mt-2">
+                                          <div>
+                                            <span className="text-[10px] font-black uppercase tracking-wider text-brand-primary block">
+                                              Granular Module Access Overrides (CEO Controls)
+                                            </span>
+                                            <p className="text-[10px] text-zinc-500 font-medium">
+                                              {currentUser?.role === "CEO" 
+                                                ? `Click any module button below to grant or remove access instantly for ${staff.name}.`
+                                                : `Role module access overview for ${staff.name}.`}
+                                            </p>
+                                          </div>
+                                          {currentUser?.role === "CEO" && staff.allowedTabs && (
+                                            <button
+                                              type="button"
+                                              onClick={() => handleResetStaffPermissions(staff.email)}
+                                              className="text-[9px] font-bold text-amber-500 hover:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 transition-all cursor-pointer shrink-0"
+                                              title="Reset custom page overrides back to role defaults"
+                                            >
+                                              Reset Defaults
+                                            </button>
+                                          )}
+                                        </div>
+
+                                        <div className="flex flex-wrap gap-1.5 pt-1">
+                                          {ALL_SYSTEM_MODULES.map((mod) => {
+                                            const isUniversal = mod.id === "overview" || mod.id === "my_profile" || mod.id === "insights_cms";
+                                            const isPermitted = isTabPermitted(mod.id, staff.role, staff.allowedTabs);
+                                            const isCeoUser = currentUser?.role === "CEO";
+
+                                            return (
+                                              <button
+                                                key={mod.id}
+                                                type="button"
+                                                disabled={!isCeoUser || isUniversal}
+                                                onClick={() => handleToggleStaffPermission(staff.email, mod.id)}
+                                                className={`text-[9px] font-bold px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 transition-all ${
+                                                  isUniversal
+                                                    ? "bg-blue-500/10 text-blue-500 border-blue-500/20 font-black cursor-default"
+                                                    : isPermitted
+                                                      ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 font-black hover:bg-emerald-500/20 shadow-xs cursor-pointer"
+                                                      : "bg-red-500/5 text-zinc-500 border-red-500/15 hover:bg-red-500/10 hover:text-zinc-400 cursor-pointer"
+                                                }`}
+                                                title={
+                                                  isUniversal
+                                                    ? "Universal module accessible to all staff members"
+                                                    : isCeoUser
+                                                      ? isPermitted ? `Click to REVOKE ${mod.label} access` : `Click to GRANT ${mod.label} access`
+                                                      : undefined
+                                                }
+                                              >
+                                                {isUniversal ? (
+                                                  <CheckCircle2 className="w-3 h-3 text-blue-500 shrink-0" />
+                                                ) : isPermitted ? (
+                                                  <Check className="w-3 h-3 text-emerald-500 shrink-0" />
+                                                ) : (
+                                                  <X className="w-3 h-3 text-zinc-400 shrink-0" />
+                                                )}
+                                                <span>{mod.label}</span>
+                                                {isUniversal && <span className="text-[7px] uppercase font-black px-1 py-0.2 bg-blue-500/20 rounded">Universal</span>}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </motion.div>
+                                    )}
                                   </div>
                                 );
                               })}
                             </div>
                           </div>
 
-                          {/* REGISTER NEW STAFF MODULE */}
-                          <div className={`p-6 border rounded-3xl relative overflow-hidden transition-all ${
+                          {/* ADMIN PERMISSION GUIDE & ROLE MATRIX SECTION */}
+                          <div className={`p-6 border rounded-3xl space-y-6 ${
                             theme === "light" ? "bg-white border-slate-200" : "bg-zinc-900/30 border-zinc-850"
                           }`}>
-                            <div className="absolute top-0 right-0 w-24 h-24 bg-brand-primary/5 rounded-full blur-2xl pointer-events-none" />
-                            <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-4 flex items-center gap-1.5">
-                              <UserPlus className="w-4 h-4 text-brand-primary" /> Provision New Administrator Profile
-                            </span>
-
-                            {newStaffError && (
-                              <div className="p-3 bg-red-500/10 border border-red-500/30 text-red-400 text-xs rounded-xl font-medium mb-4">
-                                {newStaffError}
-                              </div>
-                            )}
-
-                            {newStaffSuccess && (
-                              <div className="p-3 bg-green-500/10 border border-green-500/30 text-green-400 text-xs rounded-xl font-medium mb-4 flex items-center gap-2">
-                                <CheckCircle2 className="w-4 h-4 text-green-400 shrink-0" />
-                                <span>{newStaffSuccess}</span>
-                              </div>
-                            )}
-
-                            <form onSubmit={handleAddStaff} className="grid sm:grid-cols-2 gap-4">
-                              <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Full Name</label>
-                                <input
-                                  type="text"
-                                  required
-                                  placeholder="e.g. Divine Favor"
-                                  value={newStaffName}
-                                  onChange={(e) => setNewStaffName(e.target.value)}
-                                  className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                    theme === "light"
-                                      ? "bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400"
-                                      : "bg-zinc-950 border-zinc-850 text-white placeholder-zinc-655"
-                                  }`}
-                                />
-                              </div>
-
-                              <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Staff Email</label>
-                                <input
-                                  type="email"
-                                  required
-                                  placeholder="email@nexlify.com"
-                                  value={newStaffEmail}
-                                  onChange={(e) => setNewStaffEmail(e.target.value)}
-                                  className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                    theme === "light"
-                                      ? "bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400"
-                                      : "bg-zinc-950 border-zinc-850 text-white placeholder-zinc-655"
-                                  }`}
-                                />
-                              </div>
-
-                              <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Initial Password</label>
-                                <input
-                                  type="password"
-                                  required
-                                  placeholder="••••••••••••"
-                                  value={newStaffPassword}
-                                  onChange={(e) => setNewStaffPassword(e.target.value)}
-                                  className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                    theme === "light"
-                                      ? "bg-slate-50 border-slate-200 text-slate-900"
-                                      : "bg-zinc-950 border-zinc-850 text-white"
-                                  }`}
-                                />
-                              </div>
-
-                              <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Assign Access Level</label>
-                                <div className="grid grid-cols-2 gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => setNewStaffRole("Employee")}
-                                    className={`py-2 px-3 border rounded-xl text-xs font-bold uppercase transition-all ${
-                                      newStaffRole === "Employee"
-                                        ? "bg-zinc-850 border-zinc-750 text-white"
-                                        : theme === "light"
-                                          ? "bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-700"
-                                          : "bg-zinc-950/40 border-zinc-900 text-zinc-500 hover:text-zinc-300"
-                                    }`}
-                                  >
-                                    Employee
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => setNewStaffRole("CEO")}
-                                    className={`py-2 px-3 border rounded-xl text-xs font-bold uppercase transition-all ${
-                                      newStaffRole === "CEO"
-                                        ? "bg-brand-primary/10 border-brand-primary/30 text-brand-primary"
-                                        : theme === "light"
-                                          ? "bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-700"
-                                          : "bg-zinc-950/40 border-zinc-900 text-zinc-500 hover:text-zinc-300"
-                                    }`}
-                                  >
-                                    CEO
-                                  </button>
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-inherit">
+                              <div className="flex items-center gap-3">
+                                <div className="p-3 rounded-2xl bg-brand-primary/10 text-brand-primary border border-brand-primary/20">
+                                  <ShieldCheck className="w-6 h-6" />
+                                </div>
+                                <div>
+                                  <h4 className={`font-black text-lg tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>
+                                    Admin Role Permission Guide & Access Matrix
+                                  </h4>
+                                  <p className={`text-xs ${theme === "light" ? "text-slate-500" : "text-zinc-500"}`}>
+                                    Reference manual for Chief Executives when granting staff privileges and assigning access roles.
+                                  </p>
                                 </div>
                               </div>
 
-                              <button
-                                type="submit"
-                                disabled={newStaffLoading}
-                                className="sm:col-span-2 py-3 bg-brand-primary hover:bg-brand-primary/95 text-white rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-md shadow-brand-primary/10 transition-all mt-2 cursor-pointer"
-                              >
-                                {newStaffLoading ? (
-                                  <>Provisioning <Loader2 className="w-4 h-4 animate-spin" /></>
-                                ) : (
-                                  <>Create Administrator Account <UserPlus className="w-4 h-4" /></>
-                                )}
-                              </button>
-                            </form>
-                          </div>
+                              {/* View Mode Switcher */}
+                              <div className={`p-1 rounded-xl border flex items-center gap-1 ${
+                                theme === "light" ? "bg-slate-100 border-slate-200" : "bg-zinc-950 border-zinc-800"
+                              }`}>
+                                <button
+                                  type="button"
+                                  onClick={() => setGuideViewMode("inspector")}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                    guideViewMode === "inspector"
+                                      ? "bg-brand-primary text-white shadow-xs"
+                                      : theme === "light" ? "text-slate-600 hover:text-slate-900" : "text-zinc-400 hover:text-white"
+                                  }`}
+                                >
+                                  Role Inspector
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setGuideViewMode("matrix")}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                    guideViewMode === "matrix"
+                                      ? "bg-brand-primary text-white shadow-xs"
+                                      : theme === "light" ? "text-slate-600 hover:text-slate-900" : "text-zinc-400 hover:text-white"
+                                  }`}
+                                >
+                                  Comparison Matrix
+                                </button>
+                              </div>
+                            </div>
 
+                            {guideViewMode === "inspector" ? (
+                              <div className="space-y-6">
+                                {/* Role Selection Tabs */}
+                                <div className="flex flex-wrap gap-2">
+                                  {(["CEO", "Manager", "Developer", "Designer", "Content Editor", "Customer Support", "Employee"] as StaffUser["role"][]).map((r) => {
+                                    const isSelected = guideSelectedRole === r;
+                                    return (
+                                      <button
+                                        type="button"
+                                        key={r}
+                                        onClick={() => setGuideSelectedRole(r)}
+                                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border flex items-center gap-2 ${
+                                          isSelected
+                                            ? "bg-brand-primary text-white border-brand-primary shadow-sm"
+                                            : theme === "light"
+                                              ? "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                                              : "bg-zinc-950 border-zinc-800 text-zinc-300 hover:bg-zinc-900"
+                                        }`}
+                                      >
+                                        <span className={`w-2 h-2 rounded-full ${isSelected ? "bg-white" : "bg-brand-primary"}`} />
+                                        <span>{r}</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+
+                                {/* Selected Role Detailed Card */}
+                                {(() => {
+                                  const info = ROLE_PERMISSIONS_GUIDE[guideSelectedRole] || ROLE_PERMISSIONS_GUIDE["Employee"];
+                                  const permittedTabs = ALL_SYSTEM_MODULES.filter(m => isTabPermitted(m.id, guideSelectedRole));
+                                  const restrictedTabs = ALL_SYSTEM_MODULES.filter(m => !isTabPermitted(m.id, guideSelectedRole));
+
+                                  return (
+                                    <div className={`p-6 rounded-2xl border space-y-6 ${
+                                      theme === "light" ? "bg-slate-50/70 border-slate-200" : "bg-zinc-950/70 border-zinc-800"
+                                    }`}>
+                                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-4 border-b border-inherit">
+                                        <div>
+                                          <div className="flex items-center gap-2.5">
+                                            <h5 className={`font-black text-base ${theme === "light" ? "text-slate-900" : "text-white"}`}>
+                                              {info.title}
+                                            </h5>
+                                            <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border uppercase tracking-wider ${info.badgeClass}`}>
+                                              {info.securityLevel}
+                                            </span>
+                                          </div>
+                                          <p className={`text-xs mt-1 font-medium ${theme === "light" ? "text-slate-600" : "text-zinc-400"}`}>
+                                            {info.summary}
+                                          </p>
+                                        </div>
+
+                                        <div className="shrink-0 sm:text-right">
+                                          <span className="text-[10px] font-black uppercase text-brand-primary tracking-widest block">
+                                            Accessible Modules
+                                          </span>
+                                          <span className={`text-lg font-black ${theme === "light" ? "text-slate-900" : "text-white"}`}>
+                                            {permittedTabs.length} / {ALL_SYSTEM_MODULES.length}
+                                          </span>
+                                        </div>
+                                      </div>
+
+                                      {/* Modules Grid */}
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        {/* Permitted Modules List */}
+                                        <div className="space-y-3">
+                                          <span className="text-xs font-black uppercase tracking-wider text-emerald-500 flex items-center gap-1.5">
+                                            <CheckCircle2 className="w-4 h-4" /> Permitted Access Modules ({permittedTabs.length})
+                                          </span>
+                                          <div className="space-y-2">
+                                            {permittedTabs.map((mod) => (
+                                              <div
+                                                key={mod.id}
+                                                className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${
+                                                  theme === "light" 
+                                                    ? "bg-white border-emerald-200/80 shadow-2xs" 
+                                                    : "bg-zinc-900/80 border-emerald-500/20"
+                                                }`}
+                                              >
+                                                <div className="flex items-center gap-2.5 min-w-0">
+                                                  <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 shrink-0">
+                                                    <Check className="w-3.5 h-3.5" />
+                                                  </div>
+                                                  <div className="truncate">
+                                                    <span className={`text-xs font-bold block truncate ${theme === "light" ? "text-slate-900" : "text-white"}`}>
+                                                      {mod.label}
+                                                    </span>
+                                                    <span className="text-[9px] font-semibold text-zinc-500 block truncate">
+                                                      {mod.desc}
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                                <span className="text-[9px] font-black px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 uppercase tracking-wider shrink-0">
+                                                  {mod.category}
+                                                </span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+
+                                        {/* Restricted Modules List */}
+                                        <div className="space-y-3">
+                                          <span className="text-xs font-black uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+                                            <X className="w-4 h-4 text-red-400" /> Restricted Modules ({restrictedTabs.length})
+                                          </span>
+                                          {restrictedTabs.length === 0 ? (
+                                            <div className={`p-6 rounded-xl border text-center ${
+                                              theme === "light" ? "bg-white border-slate-200" : "bg-zinc-900/40 border-zinc-800"
+                                            }`}>
+                                              <ShieldCheck className="w-8 h-8 text-brand-primary mx-auto mb-2 opacity-80" />
+                                              <p className={`text-xs font-bold ${theme === "light" ? "text-slate-800" : "text-white"}`}>No Restricted Modules</p>
+                                              <p className="text-[10px] text-zinc-500 mt-0.5">This role possesses full system authority.</p>
+                                            </div>
+                                          ) : (
+                                            <div className="space-y-2 opacity-75">
+                                              {restrictedTabs.map((mod) => (
+                                                <div
+                                                  key={mod.id}
+                                                  className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${
+                                                    theme === "light" 
+                                                      ? "bg-slate-100/60 border-slate-200/60" 
+                                                      : "bg-zinc-900/30 border-zinc-850"
+                                                  }`}
+                                                >
+                                                  <div className="flex items-center gap-2.5 min-w-0">
+                                                    <div className="p-1.5 rounded-lg bg-red-500/10 text-red-400 shrink-0">
+                                                      <X className="w-3.5 h-3.5" />
+                                                    </div>
+                                                    <div className="truncate">
+                                                      <span className={`text-xs font-bold block truncate line-through ${theme === "light" ? "text-slate-500" : "text-zinc-500"}`}>
+                                                        {mod.label}
+                                                      </span>
+                                                      <span className="text-[9px] font-semibold text-zinc-500 block truncate">
+                                                        Access blocked for {guideSelectedRole}
+                                                      </span>
+                                                    </div>
+                                                  </div>
+                                                  <span className="text-[9px] font-black px-2 py-0.5 rounded bg-red-500/10 text-red-400 uppercase tracking-wider shrink-0">
+                                                    Restricted
+                                                  </span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* Responsibilities */}
+                                      <div className={`pt-4 border-t border-inherit space-y-2`}>
+                                        <span className="text-xs font-black uppercase tracking-wider text-brand-primary block">
+                                          Key Administrative Responsibilities & Action Limits:
+                                        </span>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                          {info.keyResponsibilities.map((resp, i) => (
+                                            <div
+                                              key={i}
+                                              className={`p-2.5 rounded-xl border flex items-start gap-2 text-xs font-semibold ${
+                                                theme === "light" ? "bg-white border-slate-200 text-slate-800" : "bg-zinc-900/80 border-zinc-800 text-zinc-200"
+                                              }`}
+                                            >
+                                              <span className="w-1.5 h-1.5 rounded-full bg-brand-primary mt-1.5 shrink-0" />
+                                              <span>{resp}</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            ) : (
+                              /* FULL COMPARISON MATRIX TABLE */
+                              <div className="overflow-x-auto custom-scrollbar">
+                                <table className="w-full text-left text-xs border-collapse min-w-[700px]">
+                                  <thead>
+                                    <tr className={`border-b text-[10px] font-black uppercase tracking-wider ${
+                                      theme === "light" ? "border-slate-200 bg-slate-100/70 text-slate-600" : "border-zinc-800 bg-zinc-950/80 text-zinc-400"
+                                    }`}>
+                                      <th className="p-3 font-black">System Module</th>
+                                      {(["CEO", "Manager", "Developer", "Designer", "Content Editor", "Customer Support", "Employee"] as StaffUser["role"][]).map((r) => (
+                                        <th key={r} className="p-3 text-center font-black">
+                                          {r}
+                                        </th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody className={`divide-y ${theme === "light" ? "divide-slate-200" : "divide-zinc-850"}`}>
+                                    {ALL_SYSTEM_MODULES.map((mod) => (
+                                      <tr key={mod.id} className={`transition-colors ${
+                                        theme === "light" ? "hover:bg-slate-50" : "hover:bg-zinc-900/40"
+                                      }`}>
+                                        <td className="p-3">
+                                          <span className={`font-bold block ${theme === "light" ? "text-slate-900" : "text-white"}`}>
+                                            {mod.label}
+                                          </span>
+                                          <span className="text-[9px] font-semibold text-zinc-500 uppercase tracking-wider">
+                                            {mod.category}
+                                          </span>
+                                        </td>
+                                        {(["CEO", "Manager", "Developer", "Designer", "Content Editor", "Customer Support", "Employee"] as StaffUser["role"][]).map((r) => {
+                                          const permitted = isTabPermitted(mod.id, r);
+                                          return (
+                                            <td key={r} className="p-3 text-center">
+                                              {permitted ? (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[9px] font-black uppercase">
+                                                  <Check className="w-2.5 h-2.5" /> Allowed
+                                                </span>
+                                              ) : (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/5 text-zinc-500 border border-red-500/10 text-[9px] font-bold uppercase opacity-50">
+                                                  <X className="w-2.5 h-2.5" /> Blocked
+                                                </span>
+                                              )}
+                                            </td>
+                                          );
+                                        })}
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
                     </>
                   )}
 
+                  {/* --- TAB: MY PROFILE --- */}
+                  {!dataLoading && activeTab === "my_profile" && (
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 max-w-4xl">
+                      {/* Page Header */}
+                      <div className="flex items-center justify-between pb-4 border-b border-inherit">
+                        <div>
+                          <h3 className={`font-black text-xl tracking-tight flex items-center gap-2 ${theme === "light" ? "text-slate-900" : "text-white"}`}>
+                            <UserCheck className="w-5 h-5 text-brand-primary" />
+                            My Staff Profile
+                          </h3>
+                          <p className={`text-xs mt-1 font-medium ${theme === "light" ? "text-slate-500" : "text-zinc-400"}`}>
+                            Manage your staff avatar image and details. Updated avatar will automatically be featured on your published corporate insights.
+                          </p>
+                        </div>
+                        <span className="text-xs font-bold px-3 py-1 rounded-full bg-brand-primary/10 text-brand-primary border border-brand-primary/20 uppercase tracking-wider">
+                          {currentUser.role}
+                        </span>
+                      </div>
+
+                      {profileSuccess && (
+                        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-xs font-bold flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 shrink-0" />
+                          <span>{profileSuccess}</span>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {/* User Card Preview */}
+                        <div className={`p-6 border rounded-2xl flex flex-col items-center text-center space-y-4 ${
+                          theme === "light" ? "bg-white border-slate-200/80 shadow-sm" : "bg-zinc-900/60 border-zinc-800"
+                        }`}>
+                          <div className="relative group">
+                            <div className="w-24 h-24 rounded-2xl overflow-hidden border-2 border-brand-primary/40 shadow-xl flex items-center justify-center bg-gradient-to-tr from-brand-primary to-indigo-600">
+                              {profileAvatar ? (
+                                <img src={profileAvatar} alt={profileName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                              ) : (
+                                <span className="text-white font-black text-3xl">{currentUser.name.charAt(0).toUpperCase()}</span>
+                              )}
+                            </div>
+                            <span className="absolute bottom-1 right-1 w-4 h-4 bg-emerald-500 rounded-full ring-4 ring-zinc-900" />
+                          </div>
+
+                          <div>
+                            <h4 className={`font-extrabold text-base tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>
+                              {profileName || currentUser.name}
+                            </h4>
+                            <p className="text-xs text-brand-primary font-bold uppercase tracking-wider mt-0.5">{currentUser.role}</p>
+                            <p className={`text-xs mt-1 font-medium ${theme === "light" ? "text-slate-500" : "text-zinc-400"}`}>{currentUser.email}</p>
+                          </div>
+
+                          <div className="w-full pt-4 border-t border-inherit space-y-2 text-left">
+                            <div className="flex justify-between items-center text-[11px]">
+                              <span className={theme === "light" ? "text-slate-500" : "text-zinc-400"}>Account ID:</span>
+                              <span className="font-mono text-[10px] font-bold">{currentUser.id}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-[11px]">
+                              <span className={theme === "light" ? "text-slate-500" : "text-zinc-400"}>Console Access:</span>
+                              <span className="text-emerald-500 font-bold uppercase text-[10px]">Active</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Edit Profile Form */}
+                        <div className={`md:col-span-2 p-6 border rounded-2xl ${
+                          theme === "light" ? "bg-white border-slate-200/80 shadow-sm" : "bg-zinc-900/60 border-zinc-800"
+                        }`}>
+                          <form onSubmit={handleSaveProfile} className="space-y-5">
+                            <h4 className="font-bold text-xs tracking-wide uppercase text-brand-primary border-b border-inherit pb-3 flex items-center gap-2">
+                              <Settings className="w-4 h-4" />
+                              Update Profile Picture & Information
+                            </h4>
+
+                            <ImageUploadField
+                              label="Profile Picture Avatar URL"
+                              value={profileAvatar}
+                              onChange={setProfileAvatar}
+                              placeholder="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e"
+                              theme={theme}
+                            />
+
+                            <div>
+                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                                Full Name
+                              </label>
+                              <input
+                                type="text"
+                                value={profileName}
+                                onChange={e => setProfileName(e.target.value)}
+                                className={`w-full px-4 py-2.5 border rounded-xl text-xs font-semibold focus:border-brand-primary focus:outline-none ${
+                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                                }`}
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                                Email Address <span className="text-zinc-500 font-normal">(Read-only)</span>
+                              </label>
+                              <input
+                                type="email"
+                                value={currentUser.email}
+                                disabled
+                                className={`w-full px-4 py-2.5 border rounded-xl text-xs font-semibold opacity-60 cursor-not-allowed ${
+                                  theme === "light" ? "bg-slate-100 border-slate-200 text-slate-700" : "bg-zinc-900 border-zinc-800 text-zinc-400"
+                                }`}
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                                Bio / Author Tagline <span className="text-zinc-500 font-normal">(Optional)</span>
+                              </label>
+                              <textarea
+                                rows={3}
+                                placeholder="e.g. Executive Leader driving AI transformation and enterprise cloud innovation..."
+                                value={profileBio}
+                                onChange={e => setProfileBio(e.target.value)}
+                                className={`w-full px-4 py-2.5 border rounded-xl text-xs font-semibold focus:border-brand-primary focus:outline-none ${
+                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                                }`}
+                              />
+                            </div>
+
+                            <div className="pt-2">
+                              <button
+                                type="submit"
+                                disabled={profileLoading}
+                                className="px-6 py-3 bg-brand-primary hover:bg-brand-primary/90 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-2"
+                              >
+                                {profileLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                Save Profile Changes
+                              </button>
+                            </div>
+                          </form>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+
                   {/* --- TAB: INSIGHTS CMS --- */}
                   {!dataLoading && activeTab === "insights_cms" && (
                     <div className="space-y-6 animate-fade-in">
-                      <div className="flex justify-between items-center pb-4 border-b border-inherit">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-inherit">
                         <div>
                           <h3 className={`font-black text-xl tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>Insights CMS</h3>
                           <p className={`text-xs ${theme === "light" ? "text-slate-500" : "text-zinc-500"}`}>Publish, edit, and delete corporate blogs and tech thoughts.</p>
@@ -2533,154 +3754,18 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                             setBlogExcerpt("");
                             setBlogContent("");
                             setBlogCategory("Technology");
-                            setBlogReadTime("5 mins read");
                             setBlogImage("");
-                            setBlogAuthorName("");
-                            setBlogAuthorRole("");
-                            setBlogAuthorAvatar("");
-                            setShowBlogForm(!showBlogForm);
+                            setBlogAuthorName(currentUser?.name || "Nexlify Admin");
+                            setBlogAuthorRole(currentUser?.role || "Administrator");
+                            setBlogAuthorAvatar(currentUser?.avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=facearea&facepad=2&w=256&h=256&q=80");
+                            setShowBlogForm(true);
                           }}
-                          className="px-4 py-2 bg-brand-primary text-white text-xs font-bold uppercase tracking-wider rounded-xl hover:bg-brand-primary/90 shadow-md transition-all cursor-pointer"
+                          className="px-4 py-2.5 bg-brand-primary text-white text-xs font-bold uppercase tracking-wider rounded-xl hover:bg-brand-primary/90 shadow-md transition-all cursor-pointer flex items-center gap-2"
                         >
-                          {showBlogForm ? "Hide Form" : "Publish New Insight"}
+                          <Plus className="w-4 h-4" />
+                          <span>Publish New Insight</span>
                         </button>
                       </div>
-
-                      {showBlogForm && (
-                        <form onSubmit={handleSaveBlog} className={`p-6 border rounded-3xl space-y-4 ${theme === "light" ? "bg-white border-slate-200" : "bg-zinc-900/30 border-zinc-850"}`}>
-                          <span className="text-[10px] font-black text-brand-primary uppercase tracking-widest block">
-                            {editingBlog ? "Edit Insight Post" : "Draft New Insight Post"}
-                          </span>
-                          <div className="grid sm:grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Post Title</label>
-                              <input
-                                type="text"
-                                required
-                                value={blogTitle}
-                                onChange={(e) => setBlogTitle(e.target.value)}
-                                className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                }`}
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Category</label>
-                              <select
-                                value={blogCategory}
-                                onChange={(e) => setBlogCategory(e.target.value)}
-                                className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-zinc-400"
-                                }`}
-                              >
-                                <option value="Technology">Technology</option>
-                                <option value="Design">Design</option>
-                                <option value="Business">Business</option>
-                                <option value="Mentorship">Mentorship</option>
-                                <option value="Corporate">Corporate</option>
-                              </select>
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Read Time</label>
-                              <input
-                                type="text"
-                                placeholder="e.g. 5 mins read"
-                                value={blogReadTime}
-                                onChange={(e) => setBlogReadTime(e.target.value)}
-                                className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                }`}
-                              />
-                            </div>
-                            <div className="sm:col-span-2">
-                              <ImageUploadField
-                                label="Header Image"
-                                value={blogImage}
-                                onChange={setBlogImage}
-                                placeholder="Header image URL or upload from device"
-                                theme={theme}
-                              />
-                            </div>
-                            <div className="sm:col-span-2 space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Short Excerpt</label>
-                              <input
-                                type="text"
-                                placeholder="Brief summary of the post"
-                                value={blogExcerpt}
-                                onChange={(e) => setBlogExcerpt(e.target.value)}
-                                className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                }`}
-                              />
-                            </div>
-                            <div className="sm:col-span-2 space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Content (Markdown Supported)</label>
-                              <textarea
-                                rows={8}
-                                required
-                                value={blogContent}
-                                onChange={(e) => setBlogContent(e.target.value)}
-                                className={`w-full p-4 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-mono ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                }`}
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Author Name</label>
-                              <input
-                                type="text"
-                                value={blogAuthorName}
-                                onChange={(e) => setBlogAuthorName(e.target.value)}
-                                placeholder={currentUser?.name}
-                                className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                }`}
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Author Role</label>
-                              <input
-                                type="text"
-                                value={blogAuthorRole}
-                                onChange={(e) => setBlogAuthorRole(e.target.value)}
-                                placeholder={currentUser?.role}
-                                className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                }`}
-                              />
-                            </div>
-                            <div className="sm:col-span-2">
-                              <ImageUploadField
-                                label="Author Avatar Image"
-                                value={blogAuthorAvatar}
-                                onChange={setBlogAuthorAvatar}
-                                placeholder="Author avatar image URL or upload from device"
-                                theme={theme}
-                              />
-                            </div>
-                          </div>
-                          <div className="flex justify-end gap-2 pt-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingBlog(null);
-                                setShowBlogForm(false);
-                              }}
-                              className={`px-4 py-2.5 border rounded-xl text-xs font-bold uppercase transition-all ${
-                                theme === "light" ? "bg-slate-100 hover:bg-slate-200 text-slate-600" : "bg-zinc-950 hover:bg-zinc-850 text-zinc-400"
-                              }`}
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="submit"
-                              className="px-5 py-2.5 bg-brand-primary text-white text-xs font-bold uppercase rounded-xl hover:bg-brand-primary/95 transition-all cursor-pointer"
-                            >
-                              {editingBlog ? "Save Changes" : "Publish Post"}
-                            </button>
-                          </div>
-                        </form>
-                      )}
 
                       <div className="grid gap-4">
                         {cmsBlogs.map(blog => (
@@ -2702,11 +3787,10 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                                   setBlogExcerpt(blog.excerpt);
                                   setBlogContent(blog.content);
                                   setBlogCategory(blog.category);
-                                  setBlogReadTime(blog.readTime);
                                   setBlogImage(blog.image);
-                                  setBlogAuthorName(blog.author.name);
-                                  setBlogAuthorRole(blog.author.role);
-                                  setBlogAuthorAvatar(blog.author.image || (blog.author as any).avatar || "");
+                                  setBlogAuthorName(blog.author?.name || currentUser?.name || "Nexlify Admin");
+                                  setBlogAuthorRole(blog.author?.role || currentUser?.role || "Administrator");
+                                  setBlogAuthorAvatar(blog.author?.image || (blog.author as any)?.avatar || currentUser?.avatar || "");
                                   setShowBlogForm(true);
                                 }}
                                 className="px-3 py-1.5 bg-brand-primary/10 text-brand-primary text-[10px] font-black uppercase tracking-wider rounded-lg hover:bg-brand-primary hover:text-white transition-all cursor-pointer"
@@ -2729,7 +3813,7 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                   {/* --- TAB: CAREERS CMS --- */}
                   {!dataLoading && activeTab === "careers_cms" && (
                     <div className="space-y-6 animate-fade-in">
-                      <div className="flex justify-between items-center pb-4 border-b border-inherit">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-inherit">
                         <div>
                           <h3 className={`font-black text-xl tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>Careers CMS</h3>
                           <p className={`text-xs ${theme === "light" ? "text-slate-500" : "text-zinc-500"}`}>Publish and manage global talent openings at Nexlify Innovation.</p>
@@ -2746,162 +3830,14 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                             setJobDesc("");
                             setJobReqs("");
                             setJobResps("");
-                            setShowJobForm(!showJobForm);
+                            setShowJobForm(true);
                           }}
-                          className="px-4 py-2 bg-brand-primary text-white text-xs font-bold uppercase tracking-wider rounded-xl hover:bg-brand-primary/90 shadow-md transition-all cursor-pointer"
+                          className="px-4 py-2.5 bg-brand-primary text-white text-xs font-bold uppercase tracking-wider rounded-xl hover:bg-brand-primary/90 shadow-md transition-all cursor-pointer flex items-center gap-2"
                         >
-                          {showJobForm ? "Hide Form" : "Publish Career Opening"}
+                          <Plus className="w-4 h-4" />
+                          <span>Publish Career Opening</span>
                         </button>
                       </div>
-
-                      {showJobForm && (
-                        <form onSubmit={handleSaveJob} className={`p-6 border rounded-3xl space-y-4 ${theme === "light" ? "bg-white border-slate-200" : "bg-zinc-900/30 border-zinc-850"}`}>
-                          <span className="text-[10px] font-black text-brand-primary uppercase tracking-widest block">
-                            {editingJob ? "Edit Job Opening" : "Draft New Job Opening"}
-                          </span>
-                          <div className="grid sm:grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Job Title</label>
-                              <input
-                                type="text"
-                                required
-                                value={jobTitle}
-                                onChange={(e) => setJobTitle(e.target.value)}
-                                className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                }`}
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Department</label>
-                              <select
-                                value={jobDept}
-                                onChange={(e) => setJobDept(e.target.value)}
-                                className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-zinc-400"
-                                }`}
-                              >
-                                <option value="Engineering">Engineering</option>
-                                <option value="Design">Design</option>
-                                <option value="Product">Product</option>
-                                <option value="Marketing">Marketing</option>
-                                <option value="Security">Security</option>
-                              </select>
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Job Type</label>
-                              <select
-                                value={jobType}
-                                onChange={(e) => setJobType(e.target.value)}
-                                className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-zinc-400"
-                                }`}
-                              >
-                                <option value="Full-time">Full-time</option>
-                                <option value="Part-time">Part-time</option>
-                                <option value="Contract">Contract</option>
-                                <option value="Remote">Remote</option>
-                              </select>
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Location</label>
-                              <input
-                                type="text"
-                                required
-                                value={jobLocation}
-                                onChange={(e) => setJobLocation(e.target.value)}
-                                className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                }`}
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Experience Level</label>
-                              <input
-                                type="text"
-                                required
-                                placeholder="e.g. Mid-level, Senior"
-                                value={jobExp}
-                                onChange={(e) => setJobExp(e.target.value)}
-                                className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                }`}
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Salary Range</label>
-                              <input
-                                type="text"
-                                required
-                                placeholder="e.g. ₦300k - ₦500k/mo"
-                                value={jobSalary}
-                                onChange={(e) => setJobSalary(e.target.value)}
-                                className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                }`}
-                              />
-                            </div>
-                            <div className="sm:col-span-2 space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Job Description</label>
-                              <textarea
-                                rows={4}
-                                required
-                                value={jobDesc}
-                                onChange={(e) => setJobDesc(e.target.value)}
-                                className={`w-full p-4 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                }`}
-                              />
-                            </div>
-                            <div className="sm:col-span-2 space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Requirements (One per line)</label>
-                              <textarea
-                                rows={4}
-                                required
-                                placeholder="Bachelor's in CS&#10;3+ years experience with React"
-                                value={jobReqs}
-                                onChange={(e) => setJobReqs(e.target.value)}
-                                className={`w-full p-4 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                }`}
-                              />
-                            </div>
-                            <div className="sm:col-span-2 space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Responsibilities (One per line)</label>
-                              <textarea
-                                rows={4}
-                                required
-                                placeholder="Build secure web apps&#10;Collaborate with CEO on product roadmap"
-                                value={jobResps}
-                                onChange={(e) => setJobResps(e.target.value)}
-                                className={`w-full p-4 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                }`}
-                              />
-                            </div>
-                          </div>
-                          <div className="flex justify-end gap-2 pt-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingJob(null);
-                                setShowJobForm(false);
-                              }}
-                              className={`px-4 py-2.5 border rounded-xl text-xs font-bold uppercase transition-all ${
-                                theme === "light" ? "bg-slate-100 hover:bg-slate-200 text-slate-600" : "bg-zinc-950 hover:bg-zinc-850 text-zinc-400"
-                              }`}
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="submit"
-                              className="px-5 py-2.5 bg-brand-primary text-white text-xs font-bold uppercase rounded-xl hover:bg-brand-primary/95 transition-all cursor-pointer"
-                            >
-                              {editingJob ? "Save Changes" : "Post Job"}
-                            </button>
-                          </div>
-                        </form>
-                      )}
 
                       <div className="grid gap-4">
                         {cmsJobs.map(job => (
@@ -2947,7 +3883,7 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                   {/* --- TAB: TRAINING CMS --- */}
                   {!dataLoading && activeTab === "training_cms" && (
                     <div className="space-y-6 animate-fade-in">
-                      <div className="flex justify-between items-center pb-4 border-b border-inherit">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-inherit">
                         <div>
                           <h3 className={`font-black text-xl tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>Training CMS</h3>
                           <p className={`text-xs ${theme === "light" ? "text-slate-500" : "text-zinc-500"}`}>Publish, edit, and coordinate technical tech courses and cohort syllabi.</p>
@@ -2965,164 +3901,14 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                             setCourseSpots(15);
                             setCourseImage("");
                             setCourseTags("");
-                            setShowCourseForm(!showCourseForm);
+                            setShowCourseForm(true);
                           }}
-                          className="px-4 py-2 bg-brand-primary text-white text-xs font-bold uppercase tracking-wider rounded-xl hover:bg-brand-primary/90 shadow-md transition-all cursor-pointer"
+                          className="px-4 py-2.5 bg-brand-primary text-white text-xs font-bold uppercase tracking-wider rounded-xl hover:bg-brand-primary/90 shadow-md transition-all cursor-pointer flex items-center gap-2"
                         >
-                          {showCourseForm ? "Hide Form" : "Add Course"}
+                          <Plus className="w-4 h-4" />
+                          <span>Add New Course</span>
                         </button>
                       </div>
-
-                      {showCourseForm && (
-                        <form onSubmit={handleSaveCourse} className={`p-6 border rounded-3xl space-y-4 ${theme === "light" ? "bg-white border-slate-200" : "bg-zinc-900/30 border-zinc-850"}`}>
-                          <span className="text-[10px] font-black text-brand-primary uppercase tracking-widest block">
-                            {editingCourse ? "Edit Course Details" : "Create New Course Module"}
-                          </span>
-                          <div className="grid sm:grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Course Title</label>
-                              <input
-                                type="text"
-                                required
-                                value={courseTitle}
-                                onChange={(e) => setCourseTitle(e.target.value)}
-                                className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                }`}
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Duration</label>
-                              <input
-                                type="text"
-                                required
-                                placeholder="e.g. 6 Weeks, 3 Months"
-                                value={courseDuration}
-                                onChange={(e) => setCourseDuration(e.target.value)}
-                                className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                }`}
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Difficulty Level</label>
-                              <select
-                                value={courseLevel}
-                                onChange={(e) => setCourseLevel(e.target.value)}
-                                className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-zinc-400"
-                                }`}
-                              >
-                                <option value="Beginner">Beginner</option>
-                                <option value="Intermediate">Intermediate</option>
-                                <option value="Advanced">Advanced</option>
-                              </select>
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Price</label>
-                              <input
-                                type="text"
-                                required
-                                placeholder="e.g. ₦120,000"
-                                value={coursePrice}
-                                onChange={(e) => setCoursePrice(e.target.value)}
-                                className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                }`}
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Next Cohort Date</label>
-                              <input
-                                type="text"
-                                placeholder="e.g. September 10, 2026"
-                                value={courseCohort}
-                                onChange={(e) => setCourseCohort(e.target.value)}
-                                className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                }`}
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Spots Available</label>
-                              <input
-                                type="number"
-                                value={courseSpots}
-                                onChange={(e) => setCourseSpots(Number(e.target.value))}
-                                className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                }`}
-                              />
-                            </div>
-                            <div className="sm:col-span-2">
-                              <ImageUploadField
-                                label="Course Cover Image"
-                                value={courseImage}
-                                onChange={setCourseImage}
-                                placeholder="Course cover image URL or upload from device"
-                                theme={theme}
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Tags (Comma separated)</label>
-                              <input
-                                type="text"
-                                placeholder="e.g. JavaScript, Backend, NodeJS"
-                                value={courseTags}
-                                onChange={(e) => setCourseTags(e.target.value)}
-                                className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                }`}
-                              />
-                            </div>
-                            <div className="sm:col-span-2 space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Course Description</label>
-                              <textarea
-                                rows={3}
-                                required
-                                value={courseDesc}
-                                onChange={(e) => setCourseDesc(e.target.value)}
-                                className={`w-full p-4 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                }`}
-                              />
-                            </div>
-                            <div className="sm:col-span-2 space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Course Syllabus (One per line)</label>
-                              <textarea
-                                rows={6}
-                                required
-                                placeholder="Week 1: Fundamentals&#10;Week 2: Advanced OOP&#10;Week 3: Testing"
-                                value={courseSyllabus}
-                                onChange={(e) => setCourseSyllabus(e.target.value)}
-                                className={`w-full p-4 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                }`}
-                              />
-                            </div>
-                          </div>
-                          <div className="flex justify-end gap-2 pt-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingCourse(null);
-                                setShowCourseForm(false);
-                              }}
-                              className={`px-4 py-2.5 border rounded-xl text-xs font-bold uppercase transition-all ${
-                                theme === "light" ? "bg-slate-100 hover:bg-slate-200 text-slate-600" : "bg-zinc-950 hover:bg-zinc-850 text-zinc-400"
-                              }`}
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="submit"
-                              className="px-5 py-2.5 bg-brand-primary text-white text-xs font-bold uppercase rounded-xl hover:bg-brand-primary/95 transition-all cursor-pointer"
-                            >
-                              {editingCourse ? "Save Changes" : "Create Course"}
-                            </button>
-                          </div>
-                        </form>
-                      )}
 
                       <div className="grid gap-4">
                         {cmsCourses.map(course => (
@@ -3314,7 +4100,7 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
 
                       {/* Team Member management roster */}
                       <div className="space-y-4">
-                        <div className="flex justify-between items-center pb-2 border-b border-inherit">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-2 border-b border-inherit">
                           <div>
                             <h4 className={`font-black text-lg ${theme === "light" ? "text-slate-900" : "text-white"}`}>Team Roster CMS</h4>
                             <p className={`text-xs ${theme === "light" ? "text-slate-500" : "text-zinc-500"}`}>Add, edit, and coordinate staff profiles displaying on our platform.</p>
@@ -3329,120 +4115,14 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                               setTeamLinkedin("");
                               setTeamTwitter("");
                               setTeamGithub("");
-                              setShowTeamForm(!showTeamForm);
+                              setShowTeamForm(true);
                             }}
-                            className="px-3 py-1.5 bg-brand-primary text-white text-[10px] font-black uppercase tracking-wider rounded-xl hover:bg-brand-primary/90 shadow-sm cursor-pointer"
+                            className="px-4 py-2.5 bg-brand-primary text-white text-xs font-bold uppercase tracking-wider rounded-xl hover:bg-brand-primary/90 shadow-sm cursor-pointer flex items-center gap-2"
                           >
-                            {showTeamForm ? "Hide Form" : "Add Team Member"}
+                            <Plus className="w-4 h-4" />
+                            <span>Add Team Member</span>
                           </button>
                         </div>
-
-                        {showTeamForm && (
-                          <form onSubmit={handleSaveTeamMemberObj} className={`p-6 border rounded-3xl space-y-4 ${theme === "light" ? "bg-white border-slate-200" : "bg-zinc-900/30 border-zinc-850"}`}>
-                            <span className="text-[10px] font-black text-brand-primary uppercase tracking-widest block">
-                              {editingTeam ? "Edit Member Profile" : "Register New Team Profile"}
-                            </span>
-                            <div className="grid sm:grid-cols-2 gap-4">
-                              <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Full Name</label>
-                                <input
-                                  type="text"
-                                  required
-                                  value={teamName}
-                                  onChange={(e) => setTeamName(e.target.value)}
-                                  className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                    theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                  }`}
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Role / Title</label>
-                                <input
-                                  type="text"
-                                  required
-                                  value={teamRole}
-                                  onChange={(e) => setTeamRole(e.target.value)}
-                                  className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                    theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                  }`}
-                                />
-                              </div>
-                              <div className="sm:col-span-2">
-                                <ImageUploadField
-                                  label="Avatar Image"
-                                  value={teamImage}
-                                  onChange={setTeamImage}
-                                  placeholder="Avatar image URL or upload from device"
-                                  theme={theme}
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">LinkedIn URL</label>
-                                <input
-                                  type="text"
-                                  value={teamLinkedin}
-                                  onChange={(e) => setTeamLinkedin(e.target.value)}
-                                  className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                    theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                  }`}
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Twitter URL</label>
-                                <input
-                                  type="text"
-                                  value={teamTwitter}
-                                  onChange={(e) => setTeamTwitter(e.target.value)}
-                                  className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                    theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                  }`}
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">GitHub URL</label>
-                                <input
-                                  type="text"
-                                  value={teamGithub}
-                                  onChange={(e) => setTeamGithub(e.target.value)}
-                                  className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                    theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                  }`}
-                                />
-                              </div>
-                              <div className="sm:col-span-2 space-y-1">
-                                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Short Biography</label>
-                                <textarea
-                                  rows={2}
-                                  value={teamBio}
-                                  onChange={(e) => setTeamBio(e.target.value)}
-                                  className={`w-full p-4 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                    theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                  }`}
-                                />
-                              </div>
-                            </div>
-                            <div className="flex justify-end gap-2 pt-2">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingTeam(null);
-                                  setShowTeamForm(false);
-                                }}
-                                className={`px-4 py-2.5 border rounded-xl text-xs font-bold uppercase transition-all ${
-                                  theme === "light" ? "bg-slate-100 hover:bg-slate-200 text-slate-600" : "bg-zinc-950 hover:bg-zinc-850 text-zinc-400"
-                                }`}
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                type="submit"
-                                className="px-5 py-2.5 bg-brand-primary text-white text-xs font-bold uppercase rounded-xl hover:bg-brand-primary/95 transition-all cursor-pointer"
-                              >
-                                {editingTeam ? "Save Changes" : "Register Member"}
-                              </button>
-                            </div>
-                          </form>
-                        )}
 
                         <div className="grid gap-4">
                           {cmsTeam.map(member => (
@@ -3490,7 +4170,7 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                   {/* --- TAB: PORTFOLIO CMS --- */}
                   {!dataLoading && activeTab === "portfolio_cms" && (
                     <div className="space-y-6 animate-fade-in">
-                      <div className="flex justify-between items-center pb-4 border-b border-inherit">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-inherit">
                         <div>
                           <h3 className={`font-black text-xl tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>Portfolio CMS</h3>
                           <p className={`text-xs ${theme === "light" ? "text-slate-500" : "text-zinc-500"}`}>Publish and showcase technical innovations, apps, and platforms built by Nexlify.</p>
@@ -3499,141 +4179,44 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                           onClick={() => {
                             setEditingProject(null);
                             setProjectTitle("");
-                            setProjectCategory("Software");
+                            setProjectCategory(
+                              currentUser?.role === "Designer"
+                                ? "Graphic Designs"
+                                : currentUser?.role === "Developer"
+                                  ? "Websites"
+                                  : "Websites"
+                            );
                             setProjectDesc("");
                             setProjectLongDesc("");
                             setProjectImage("");
                             setProjectTags("");
                             setProjectLink("");
-                            setShowProjectForm(!showProjectForm);
+                            setShowProjectForm(true);
                           }}
-                          className="px-4 py-2 bg-brand-primary text-white text-xs font-bold uppercase tracking-wider rounded-xl hover:bg-brand-primary/90 shadow-md transition-all cursor-pointer"
+                          className="px-4 py-2.5 bg-brand-primary text-white text-xs font-bold uppercase tracking-wider rounded-xl hover:bg-brand-primary/90 shadow-md transition-all cursor-pointer flex items-center gap-2"
                         >
-                          {showProjectForm ? "Hide Form" : "Add Project"}
+                          <Plus className="w-4 h-4" />
+                          <span>Add New Project</span>
                         </button>
                       </div>
 
-                      {showProjectForm && (
-                        <form onSubmit={handleSaveProject} className={`p-6 border rounded-3xl space-y-4 ${theme === "light" ? "bg-white border-slate-200" : "bg-zinc-900/30 border-zinc-850"}`}>
-                          <span className="text-[10px] font-black text-brand-primary uppercase tracking-widest block">
-                            {editingProject ? "Edit Project Details" : "Feature New Innovation Project"}
-                          </span>
-                          <div className="grid sm:grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Project Title</label>
-                              <input
-                                type="text"
-                                required
-                                value={projectTitle}
-                                onChange={(e) => setProjectTitle(e.target.value)}
-                                className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                }`}
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Category</label>
-                              <select
-                                value={projectCategory}
-                                onChange={(e) => setProjectCategory(e.target.value)}
-                                className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-zinc-400"
-                                }`}
-                              >
-                                <option value="Websites">Websites</option>
-                                <option value="Graphic Designs">Graphic Designs</option>
-                              </select>
-                            </div>
-                            <div className="sm:col-span-2">
-                              <ImageUploadField
-                                label="Cover Image"
-                                value={projectImage}
-                                onChange={setProjectImage}
-                                placeholder="Project cover image URL or upload from device"
-                                theme={theme}
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Tags (Comma separated)</label>
-                              <input
-                                type="text"
-                                placeholder="React, Firebase, Cloud, SaaS"
-                                value={projectTags}
-                                onChange={(e) => setProjectTags(e.target.value)}
-                                className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                }`}
-                              />
-                            </div>
-                            <div className="sm:col-span-2 space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Platform Link (Optional)</label>
-                              <input
-                                type="text"
-                                placeholder="https://nexlify-example.com"
-                                value={projectLink}
-                                onChange={(e) => setProjectLink(e.target.value)}
-                                className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                }`}
-                              />
-                            </div>
-                            <div className="sm:col-span-2 space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Short Pitch</label>
-                              <textarea
-                                rows={2}
-                                required
-                                value={projectDesc}
-                                onChange={(e) => setProjectDesc(e.target.value)}
-                                className={`w-full p-4 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                }`}
-                              />
-                            </div>
-                            <div className="sm:col-span-2 space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Long Story (Optional)</label>
-                              <textarea
-                                rows={4}
-                                value={projectLongDesc}
-                                onChange={(e) => setProjectLongDesc(e.target.value)}
-                                className={`w-full p-4 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                }`}
-                              />
-                            </div>
-                          </div>
-                          <div className="flex justify-end gap-2 pt-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingProject(null);
-                                setShowProjectForm(false);
-                              }}
-                              className={`px-4 py-2.5 border rounded-xl text-xs font-bold uppercase transition-all ${
-                                theme === "light" ? "bg-slate-100 hover:bg-slate-200 text-slate-600" : "bg-zinc-950 hover:bg-zinc-850 text-zinc-400"
-                              }`}
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="submit"
-                              className="px-5 py-2.5 bg-brand-primary text-white text-xs font-bold uppercase rounded-xl hover:bg-brand-primary/95 transition-all cursor-pointer"
-                            >
-                              {editingProject ? "Save Changes" : "Feature Project"}
-                            </button>
-                          </div>
-                        </form>
-                      )}
-
                       <div className="grid gap-4">
-                        {cmsProjects.map(project => (
-                          <div key={project.id} className={`p-4 border rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${
+                        {cmsProjects
+                          .filter(p => {
+                            const cat = normalizeProjectCategory(p.category);
+                            if (currentUser?.role === "Designer") return cat === "Graphic Designs";
+                            if (currentUser?.role === "Developer") return cat === "Websites";
+                            return true;
+                          })
+                          .map(project => (
+                            <div key={project.id} className={`p-4 border rounded-2xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${
                             theme === "light" ? "bg-white border-slate-200" : "bg-zinc-900/30 border-zinc-850"
                           }`}>
                             <div className="flex gap-4 items-center truncate">
                               <img src={project.image} className="w-16 h-12 rounded-lg object-cover" referrerPolicy="no-referrer" />
                               <div className="truncate">
                                 <h4 className={`font-bold text-sm truncate ${theme === "light" ? "text-slate-900" : "text-white"}`}>{project.title}</h4>
-                                <span className="text-[10px] text-zinc-500 uppercase font-black tracking-wider">{project.category}</span>
+                                <span className="text-[10px] text-zinc-500 uppercase font-black tracking-wider">{normalizeProjectCategory(project.category)}</span>
                               </div>
                             </div>
                             <div className="flex gap-2 shrink-0">
@@ -3669,7 +4252,7 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                   {/* --- TAB: SERVICES CMS --- */}
                   {!dataLoading && activeTab === "services_cms" && (
                     <div className="space-y-6 animate-fade-in">
-                      <div className="flex justify-between items-center pb-4 border-b border-inherit">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-inherit">
                         <div>
                           <h3 className={`font-black text-xl tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>Services CMS</h3>
                           <p className={`text-xs ${theme === "light" ? "text-slate-500" : "text-zinc-500"}`}>Publish, adjust, and structure engineering capabilities offered by Nexlify.</p>
@@ -3682,108 +4265,14 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                             setServiceIcon("Cpu");
                             setServiceFeatures("");
                             setServiceImage("");
-                            setShowServiceForm(!showServiceForm);
+                            setShowServiceForm(true);
                           }}
-                          className="px-4 py-2 bg-brand-primary text-white text-xs font-bold uppercase tracking-wider rounded-xl hover:bg-brand-primary/90 shadow-md transition-all cursor-pointer"
+                          className="px-4 py-2.5 bg-brand-primary text-white text-xs font-bold uppercase tracking-wider rounded-xl hover:bg-brand-primary/90 shadow-md transition-all cursor-pointer flex items-center gap-2"
                         >
-                          {showServiceForm ? "Hide Form" : "Add Service"}
+                          <Plus className="w-4 h-4" />
+                          <span>Add New Service</span>
                         </button>
                       </div>
-
-                      {showServiceForm && (
-                        <form onSubmit={handleSaveService} className={`p-6 border rounded-3xl space-y-4 ${theme === "light" ? "bg-white border-slate-200" : "bg-zinc-900/30 border-zinc-850"}`}>
-                          <span className="text-[10px] font-black text-brand-primary uppercase tracking-widest block">
-                            {editingService ? "Edit Service Parameters" : "Publish New Platform Service"}
-                          </span>
-                          <div className="grid sm:grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Service Title</label>
-                              <input
-                                type="text"
-                                required
-                                value={serviceTitle}
-                                onChange={(e) => setServiceTitle(e.target.value)}
-                                className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                }`}
-                              />
-                            </div>
-                            <div className="space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Visual Icon</label>
-                              <select
-                                value={serviceIcon}
-                                onChange={(e) => setServiceIcon(e.target.value)}
-                                className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-zinc-400"
-                                }`}
-                              >
-                                <option value="Cpu">Cpu / Processing Core</option>
-                                <option value="Layout">Layout / User Interfaces</option>
-                                <option value="Database">Database / Big Data Layer</option>
-                                <option value="Globe">Globe / Worldwide Ingress</option>
-                                <option value="Cloud">Cloud / Serverless Node</option>
-                                <option value="Shield">Shield / Security Node</option>
-                                <option value="Terminal">Terminal / Automation Console</option>
-                              </select>
-                            </div>
-                            <div className="sm:col-span-2">
-                              <ImageUploadField
-                                label="Service Cover Image"
-                                value={serviceImage}
-                                onChange={setServiceImage}
-                                theme={theme}
-                                placeholder="Service cover image URL or upload from device"
-                              />
-                            </div>
-                            <div className="sm:col-span-2 space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Short Capability Summary</label>
-                              <textarea
-                                rows={2}
-                                required
-                                value={serviceDesc}
-                                onChange={(e) => setServiceDesc(e.target.value)}
-                                className={`w-full p-4 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                }`}
-                              />
-                            </div>
-                            <div className="sm:col-span-2 space-y-1">
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Detailed Features / Deliverables (One per line)</label>
-                              <textarea
-                                rows={4}
-                                required
-                                placeholder="High performance Node.js runtime&#10;Highly optimized SQLite storage layers"
-                                value={serviceFeatures}
-                                onChange={(e) => setServiceFeatures(e.target.value)}
-                                className={`w-full p-4 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-850 text-white"
-                                }`}
-                              />
-                            </div>
-                          </div>
-                          <div className="flex justify-end gap-2 pt-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingService(null);
-                                setServiceImage("");
-                                setShowServiceForm(false);
-                              }}
-                              className={`px-4 py-2.5 border rounded-xl text-xs font-bold uppercase transition-all ${
-                                theme === "light" ? "bg-slate-100 hover:bg-slate-200 text-slate-600" : "bg-zinc-950 hover:bg-zinc-850 text-zinc-400"
-                              }`}
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="submit"
-                              className="px-5 py-2.5 bg-brand-primary text-white text-xs font-bold uppercase rounded-xl hover:bg-brand-primary/95 transition-all cursor-pointer"
-                            >
-                              {editingService ? "Save Changes" : "Publish Service"}
-                            </button>
-                          </div>
-                        </form>
-                      )}
 
                       <div className="grid gap-4">
                         {cmsServices.map(service => (
@@ -3830,8 +4319,1371 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
 
           </div>
 
-          {/* EDIT NOTES MODALS AREA */}
+          {/* EDIT NOTES MODALS AREA & CMS POPUP FORMS */}
           <AnimatePresence>
+            {/* STAFF USER MODAL FORM */}
+            {showStaffForm && (
+              <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setShowStaffForm(false)}
+                  className="absolute inset-0 bg-black/70 backdrop-blur-md"
+                />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                  className={`relative w-full max-w-lg max-h-[85vh] overflow-y-auto border rounded-[2rem] shadow-2xl z-10 p-6 sm:p-8 transition-all ${
+                    theme === "light" ? "bg-white border-slate-200 text-slate-900" : "bg-zinc-900 border-zinc-800 text-white"
+                  }`}
+                >
+                  <button
+                    onClick={() => setShowStaffForm(false)}
+                    className={`absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer border ${
+                      theme === "light" ? "bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-800" : "bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2.5 rounded-xl bg-brand-primary/10 text-brand-primary">
+                      <UserPlus className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-lg tracking-tight">Provision Staff Member</h3>
+                      <p className={`text-xs ${theme === "light" ? "text-slate-500" : "text-zinc-500"}`}>Add a new team member with administrative access.</p>
+                    </div>
+                  </div>
+
+                  {newStaffError && (
+                    <div className="my-3 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-semibold">
+                      {newStaffError}
+                    </div>
+                  )}
+                  {newStaffSuccess && (
+                    <div className="my-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-xs font-semibold">
+                      {newStaffSuccess}
+                    </div>
+                  )}
+
+                  <form onSubmit={handleAddStaff} className="space-y-4 mt-4">
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">Full Name</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Sarah Jenkins"
+                        value={newStaffName}
+                        onChange={e => setNewStaffName(e.target.value)}
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
+                          theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">Email Address</label>
+                      <input
+                        type="email"
+                        required
+                        placeholder="s.jenkins@nexlify.com"
+                        value={newStaffEmail}
+                        onChange={e => setNewStaffEmail(e.target.value)}
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
+                          theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">Password</label>
+                      <input
+                        type="password"
+                        required
+                        placeholder="••••••••"
+                        value={newStaffPassword}
+                        onChange={e => setNewStaffPassword(e.target.value)}
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
+                          theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">Assigned Role</label>
+                      <select
+                        value={newStaffRole}
+                        onChange={e => setNewStaffRole(e.target.value as StaffUser["role"])}
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none transition-all font-semibold ${
+                          theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                        }`}
+                      >
+                        <option value="Employee">Employee</option>
+                        <option value="Manager">Manager</option>
+                        <option value="Designer">Designer</option>
+                        <option value="Developer">Developer</option>
+                        <option value="Content Editor">Content Editor</option>
+                        <option value="Customer Support">Customer Support</option>
+                        <option value="CEO">CEO</option>
+                      </select>
+                    </div>
+
+                    {/* LIVE PERMISSIONS PREVIEW BOX FOR SELECTED ROLE */}
+                    {(() => {
+                      const roleInfo = ROLE_PERMISSIONS_GUIDE[newStaffRole] || ROLE_PERMISSIONS_GUIDE["Employee"];
+                      const permittedMods = ALL_SYSTEM_MODULES.filter(m => isTabPermitted(m.id, newStaffRole));
+                      
+                      return (
+                        <div className={`p-4 rounded-2xl border space-y-3 ${
+                          theme === "light" ? "bg-slate-50 border-slate-200" : "bg-zinc-950 border-zinc-800"
+                        }`}>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-brand-primary flex items-center gap-1.5">
+                              <ShieldCheck className="w-3.5 h-3.5" />
+                              Access Scope Preview ({permittedMods.length} Modules)
+                            </span>
+                            <span className={`text-[8px] font-black px-2 py-0.5 rounded-full border uppercase ${roleInfo.badgeClass}`}>
+                              {roleInfo.securityLevel}
+                            </span>
+                          </div>
+
+                          <p className={`text-xs font-medium leading-relaxed ${theme === "light" ? "text-slate-600" : "text-zinc-400"}`}>
+                            {roleInfo.summary}
+                          </p>
+
+                          <div className="space-y-1.5 pt-1">
+                            <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider block">
+                              Permitted Access Hubs:
+                            </span>
+                            <div className="flex flex-wrap gap-1">
+                              {ALL_SYSTEM_MODULES.map(m => {
+                                const ok = isTabPermitted(m.id, newStaffRole);
+                                return (
+                                  <span
+                                    key={m.id}
+                                    className={`text-[9px] font-bold px-2 py-0.5 rounded border flex items-center gap-1 ${
+                                      ok
+                                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-black"
+                                        : "bg-red-500/5 text-zinc-500 border-red-500/10 line-through opacity-40"
+                                    }`}
+                                  >
+                                    {ok ? <Check className="w-2.5 h-2.5" /> : <X className="w-2.5 h-2.5" />}
+                                    {m.label}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    <div className="flex gap-3 pt-4 border-t border-inherit">
+                      <button
+                        type="button"
+                        onClick={() => setShowStaffForm(false)}
+                        className={`w-1/2 py-2.5 border rounded-xl text-xs font-bold uppercase transition-colors cursor-pointer ${
+                          theme === "light" ? "border-slate-200 text-slate-500 hover:bg-slate-50" : "border-zinc-800 text-zinc-400 hover:text-white"
+                        }`}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={newStaffLoading}
+                        className="w-1/2 py-2.5 bg-brand-primary hover:bg-brand-primary/95 text-white rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
+                      >
+                        {newStaffLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Provision User"}
+                      </button>
+                    </div>
+                  </form>
+                </motion.div>
+              </div>
+            )}
+
+            {/* ABOUT PAGE NARRATIVE MODAL FORM */}
+            {showAboutForm && (
+              <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setShowAboutForm(false)}
+                  className="absolute inset-0 bg-black/70 backdrop-blur-md"
+                />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                  className={`relative w-full max-w-2xl max-h-[85vh] overflow-y-auto border rounded-[2rem] shadow-2xl z-10 p-6 sm:p-8 transition-all ${
+                    theme === "light" ? "bg-white border-slate-200 text-slate-900" : "bg-zinc-900 border-zinc-800 text-white"
+                  }`}
+                >
+                  <button
+                    onClick={() => setShowAboutForm(false)}
+                    className={`absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer border ${
+                      theme === "light" ? "bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-800" : "bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2.5 rounded-xl bg-brand-primary/10 text-brand-primary">
+                      <Info className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-lg tracking-tight">Edit About Page Narrative</h3>
+                      <p className={`text-xs ${theme === "light" ? "text-slate-500" : "text-zinc-500"}`}>Update mission, vision, and hero content for the public site.</p>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleSaveAboutPageInfo} className="space-y-4 mt-4">
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">Page Hero Title</label>
+                      <input
+                        type="text"
+                        value={aboutTitle}
+                        onChange={e => setAboutTitle(e.target.value)}
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold ${
+                          theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">Headline Subtitle / Short Story</label>
+                      <textarea
+                        rows={2}
+                        value={aboutStory}
+                        onChange={e => setAboutStory(e.target.value)}
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold resize-none ${
+                          theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">Company Overview Narrative</label>
+                      <textarea
+                        rows={4}
+                        value={aboutDesc}
+                        onChange={e => setAboutDesc(e.target.value)}
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold resize-none ${
+                          theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                        }`}
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">Company Vision</label>
+                        <textarea
+                          rows={3}
+                          value={aboutVision}
+                          onChange={e => setAboutVision(e.target.value)}
+                          className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold resize-none ${
+                            theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">Company Mission</label>
+                        <textarea
+                          rows={3}
+                          value={aboutMission}
+                          onChange={e => setAboutMission(e.target.value)}
+                          className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold resize-none ${
+                            theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                          }`}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="p-4 border rounded-2xl space-y-3 bg-zinc-500/5 border-inherit">
+                      <h4 className="text-xs font-black uppercase tracking-wider text-brand-primary">Future Vision Section</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">Future Title</label>
+                          <input
+                            type="text"
+                            value={aboutFutureTitle}
+                            onChange={e => setAboutFutureTitle(e.target.value)}
+                            className={`w-full px-3 py-2 border rounded-xl text-xs font-semibold ${
+                              theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                            }`}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">Future Description</label>
+                          <input
+                            type="text"
+                            value={aboutFutureDesc}
+                            onChange={e => setAboutFutureDesc(e.target.value)}
+                            className={`w-full px-3 py-2 border rounded-xl text-xs font-semibold ${
+                              theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                            }`}
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">Metric Count</label>
+                          <input
+                            type="text"
+                            value={aboutFutureMetricCount}
+                            onChange={e => setAboutFutureMetricCount(e.target.value)}
+                            className={`w-full px-3 py-2 border rounded-xl text-xs font-semibold ${
+                              theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                            }`}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">Metric Title</label>
+                          <input
+                            type="text"
+                            value={aboutFutureMetricTitle}
+                            onChange={e => setAboutFutureMetricTitle(e.target.value)}
+                            className={`w-full px-3 py-2 border rounded-xl text-xs font-semibold ${
+                              theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                            }`}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">Metric Subtitle</label>
+                          <input
+                            type="text"
+                            value={aboutFutureMetricSubtitle}
+                            onChange={e => setAboutFutureMetricSubtitle(e.target.value)}
+                            className={`w-full px-3 py-2 border rounded-xl text-xs font-semibold ${
+                              theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                            }`}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3 pt-4 border-t border-inherit">
+                      <button
+                        type="button"
+                        onClick={() => setShowAboutForm(false)}
+                        className={`w-1/2 py-2.5 border rounded-xl text-xs font-bold uppercase transition-colors cursor-pointer ${
+                          theme === "light" ? "border-slate-200 text-slate-500 hover:bg-slate-50" : "border-zinc-800 text-zinc-400 hover:text-white"
+                        }`}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isSavingAbout}
+                        className="w-1/2 py-2.5 bg-brand-primary hover:bg-brand-primary/95 text-white rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
+                      >
+                        {isSavingAbout ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save Changes"}
+                      </button>
+                    </div>
+                  </form>
+                </motion.div>
+              </div>
+            )}
+
+            {/* TEAM MEMBER MODAL FORM */}
+            {showTeamForm && (
+              <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setShowTeamForm(false)}
+                  className="absolute inset-0 bg-black/70 backdrop-blur-md"
+                />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                  className={`relative w-full max-w-xl max-h-[85vh] overflow-y-auto border rounded-[2rem] shadow-2xl z-10 p-6 sm:p-8 transition-all ${
+                    theme === "light" ? "bg-white border-slate-200 text-slate-900" : "bg-zinc-900 border-zinc-800 text-white"
+                  }`}
+                >
+                  <button
+                    onClick={() => setShowTeamForm(false)}
+                    className={`absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer border ${
+                      theme === "light" ? "bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-800" : "bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2.5 rounded-xl bg-brand-primary/10 text-brand-primary">
+                      <Users className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-lg tracking-tight">{editingTeam ? "Edit Team Member" : "Add Team Member"}</h3>
+                      <p className={`text-xs ${theme === "light" ? "text-slate-500" : "text-zinc-500"}`}>Upload photo, enter member name, role, and optional bio.</p>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleSaveTeamMemberObj} className="space-y-4 mt-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                          Member Name <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Dr. Alex Vance"
+                          value={teamName}
+                          onChange={e => setTeamName(e.target.value)}
+                          className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold ${
+                            theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                          Role / Position <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Lead Designer / Developer"
+                          value={teamRole}
+                          onChange={e => setTeamRole(e.target.value)}
+                          className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold ${
+                            theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                          }`}
+                        />
+                      </div>
+                    </div>
+
+                    <ImageUploadField
+                      label="Upload Member Photo / Image (Optional)"
+                      value={teamImage}
+                      onChange={setTeamImage}
+                      placeholder="https://images.unsplash.com/photo-1519085360753-af0119f7cbe7"
+                      theme={theme}
+                    />
+
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                        Member Biography / Notes <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                      </label>
+                      <textarea
+                        rows={3}
+                        placeholder="Brief bio or description (optional)..."
+                        value={teamBio}
+                        onChange={e => setTeamBio(e.target.value)}
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold resize-none ${
+                          theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                        }`}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                          LinkedIn <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="https://linkedin.com/in/..."
+                          value={teamLinkedin}
+                          onChange={e => setTeamLinkedin(e.target.value)}
+                          className={`w-full px-3 py-2 border rounded-xl text-xs font-semibold ${
+                            theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                          Twitter <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="https://twitter.com/..."
+                          value={teamTwitter}
+                          onChange={e => setTeamTwitter(e.target.value)}
+                          className={`w-full px-3 py-2 border rounded-xl text-xs font-semibold ${
+                            theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                          GitHub <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="https://github.com/..."
+                          value={teamGithub}
+                          onChange={e => setTeamGithub(e.target.value)}
+                          className={`w-full px-3 py-2 border rounded-xl text-xs font-semibold ${
+                            theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                          }`}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3 pt-4 border-t border-inherit">
+                      <button
+                        type="button"
+                        onClick={() => setShowTeamForm(false)}
+                        className={`w-1/2 py-2.5 border rounded-xl text-xs font-bold uppercase transition-colors cursor-pointer ${
+                          theme === "light" ? "border-slate-200 text-slate-500 hover:bg-slate-50" : "border-zinc-800 text-zinc-400 hover:text-white"
+                        }`}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="w-1/2 py-2.5 bg-brand-primary hover:bg-brand-primary/95 text-white rounded-xl text-xs font-bold uppercase tracking-wider shadow-md transition-all cursor-pointer"
+                      >
+                        {editingTeam ? "Update Member" : "Save Member"}
+                      </button>
+                    </div>
+                  </form>
+                </motion.div>
+              </div>
+            )}
+
+            {/* BLOG / INSIGHT MODAL FORM */}
+            {showBlogForm && (
+              <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setShowBlogForm(false)}
+                  className="absolute inset-0 bg-black/70 backdrop-blur-md"
+                />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                  className={`relative w-full max-w-2xl max-h-[85vh] overflow-y-auto border rounded-[2rem] shadow-2xl z-10 p-6 sm:p-8 transition-all ${
+                    theme === "light" ? "bg-white border-slate-200 text-slate-900" : "bg-zinc-900 border-zinc-800 text-white"
+                  }`}
+                >
+                  <button
+                    onClick={() => setShowBlogForm(false)}
+                    className={`absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer border ${
+                      theme === "light" ? "bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-800" : "bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2.5 rounded-xl bg-brand-primary/10 text-brand-primary">
+                      <BookOpen className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-lg tracking-tight">{editingBlog ? "Edit Insight Article" : "Publish New Insight"}</h3>
+                      <p className={`text-xs ${theme === "light" ? "text-slate-500" : "text-zinc-500"}`}>Upload banner image, enter title, and optional article content.</p>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleSaveBlog} className="space-y-4 mt-4">
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                        Article Title <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Modern UI Design Trends in 2026"
+                        value={blogTitle}
+                        onChange={e => setBlogTitle(e.target.value)}
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold ${
+                          theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                        }`}
+                      />
+                    </div>
+
+                    <ImageUploadField
+                      label="Upload Article Cover Image / Design (Optional)"
+                      value={blogImage}
+                      onChange={setBlogImage}
+                      placeholder="https://images.unsplash.com/photo-1516321318423-f06f85e504b3"
+                      theme={theme}
+                    />
+
+                    <div className="grid grid-cols-1 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                          Category <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                        </label>
+                        <select
+                          value={blogCategory}
+                          onChange={e => setBlogCategory(e.target.value)}
+                          className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold ${
+                            theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                          }`}
+                        >
+                          <option value="Technology">Technology</option>
+                          <option value="Design">Design</option>
+                          <option value="AI & Engineering">AI & Engineering</option>
+                          <option value="Case Studies">Case Studies</option>
+                          <option value="Industry Trends">Industry Trends</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                        Short Excerpt / Description <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                      </label>
+                      <textarea
+                        rows={2}
+                        placeholder="Brief description or summary (optional)..."
+                        value={blogExcerpt}
+                        onChange={e => setBlogExcerpt(e.target.value)}
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold resize-none ${
+                          theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                        Full Article Content <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                      </label>
+                      <textarea
+                        rows={5}
+                        placeholder="Article details and full text (optional)..."
+                        value={blogContent}
+                        onChange={e => setBlogContent(e.target.value)}
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold resize-none ${
+                          theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                        }`}
+                      />
+                    </div>
+
+                    <div className="flex gap-3 pt-4 border-t border-inherit">
+                      <button
+                        type="button"
+                        onClick={() => setShowBlogForm(false)}
+                        className={`w-1/2 py-2.5 border rounded-xl text-xs font-bold uppercase transition-colors cursor-pointer ${
+                          theme === "light" ? "border-slate-200 text-slate-500 hover:bg-slate-50" : "border-zinc-800 text-zinc-400 hover:text-white"
+                        }`}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="w-1/2 py-2.5 bg-brand-primary hover:bg-brand-primary/95 text-white rounded-xl text-xs font-bold uppercase tracking-wider shadow-md transition-all cursor-pointer"
+                      >
+                        {editingBlog ? "Update Article" : "Publish Article"}
+                      </button>
+                    </div>
+                  </form>
+                </motion.div>
+              </div>
+            )}
+
+            {/* JOB / CAREER OPENING MODAL FORM */}
+            {showJobForm && (
+              <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setShowJobForm(false)}
+                  className="absolute inset-0 bg-black/70 backdrop-blur-md"
+                />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                  className={`relative w-full max-w-2xl max-h-[85vh] overflow-y-auto border rounded-[2rem] shadow-2xl z-10 p-6 sm:p-8 transition-all ${
+                    theme === "light" ? "bg-white border-slate-200 text-slate-900" : "bg-zinc-900 border-zinc-800 text-white"
+                  }`}
+                >
+                  <button
+                    onClick={() => setShowJobForm(false)}
+                    className={`absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer border ${
+                      theme === "light" ? "bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-800" : "bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2.5 rounded-xl bg-brand-primary/10 text-brand-primary">
+                      <Briefcase className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-lg tracking-tight">{editingJob ? "Edit Career Opportunity" : "Post New Career Opening"}</h3>
+                      <p className={`text-xs ${theme === "light" ? "text-slate-500" : "text-zinc-500"}`}>Enter position title and optional role details.</p>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleSaveJob} className="space-y-4 mt-4">
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                        Position Title <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. UI/UX Designer / Software Engineer"
+                        value={jobTitle}
+                        onChange={e => setJobTitle(e.target.value)}
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold ${
+                          theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                        }`}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                          Department <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                        </label>
+                        <select
+                          value={jobDept}
+                          onChange={e => setJobDept(e.target.value)}
+                          className={`w-full px-3 py-2 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold ${
+                            theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                          }`}
+                        >
+                          <option value="Engineering">Engineering</option>
+                          <option value="Design">Design</option>
+                          <option value="Product">Product</option>
+                          <option value="Support">Support</option>
+                          <option value="Operations">Operations</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                          Employment Type <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                        </label>
+                        <select
+                          value={jobType}
+                          onChange={e => setJobType(e.target.value)}
+                          className={`w-full px-3 py-2 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold ${
+                            theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                          }`}
+                        >
+                          <option value="Full-time">Full-time</option>
+                          <option value="Part-time">Part-time</option>
+                          <option value="Contract">Contract</option>
+                          <option value="Internship">Internship</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                          Location <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Remote / Lagos"
+                          value={jobLocation}
+                          onChange={e => setJobLocation(e.target.value)}
+                          className={`w-full px-3 py-2 border rounded-xl text-xs font-semibold ${
+                            theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                          }`}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                          Experience Level <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Mid-level (2+ Yrs)"
+                          value={jobExp}
+                          onChange={e => setJobExp(e.target.value)}
+                          className={`w-full px-3 py-2 border rounded-xl text-xs font-semibold ${
+                            theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                          Salary Range <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. ₦300k - ₦500k/mo"
+                          value={jobSalary}
+                          onChange={e => setJobSalary(e.target.value)}
+                          className={`w-full px-3 py-2 border rounded-xl text-xs font-semibold ${
+                            theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                          }`}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                        Job Description <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                      </label>
+                      <textarea
+                        rows={3}
+                        placeholder="Overview of the role (optional)..."
+                        value={jobDesc}
+                        onChange={e => setJobDesc(e.target.value)}
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold resize-none ${
+                          theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                        Key Requirements <span className="text-xs font-normal text-slate-400">(Optional - One per line)</span>
+                      </label>
+                      <textarea
+                        rows={2}
+                        placeholder="Key requirements (optional)..."
+                        value={jobReqs}
+                        onChange={e => setJobReqs(e.target.value)}
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold resize-none ${
+                          theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                        Benefits & Perks <span className="text-xs font-normal text-slate-400">(Optional - One per line)</span>
+                      </label>
+                      <textarea
+                        rows={2}
+                        placeholder="Perks and benefits (optional)..."
+                        value={jobResps}
+                        onChange={e => setJobResps(e.target.value)}
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold resize-none ${
+                          theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                        }`}
+                      />
+                    </div>
+
+                    <div className="flex gap-3 pt-4 border-t border-inherit">
+                      <button
+                        type="button"
+                        onClick={() => setShowJobForm(false)}
+                        className={`w-1/2 py-2.5 border rounded-xl text-xs font-bold uppercase transition-colors cursor-pointer ${
+                          theme === "light" ? "border-slate-200 text-slate-500 hover:bg-slate-50" : "border-zinc-800 text-zinc-400 hover:text-white"
+                        }`}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="w-1/2 py-2.5 bg-brand-primary hover:bg-brand-primary/95 text-white rounded-xl text-xs font-bold uppercase tracking-wider shadow-md transition-all cursor-pointer"
+                      >
+                        {editingJob ? "Update Opening" : "Post Opening"}
+                      </button>
+                    </div>
+                  </form>
+                </motion.div>
+              </div>
+            )}
+
+            {/* TRAINING COURSE MODAL FORM */}
+            {showCourseForm && (
+              <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setShowCourseForm(false)}
+                  className="absolute inset-0 bg-black/70 backdrop-blur-md"
+                />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                  className={`relative w-full max-w-2xl max-h-[85vh] overflow-y-auto border rounded-[2rem] shadow-2xl z-10 p-6 sm:p-8 transition-all ${
+                    theme === "light" ? "bg-white border-slate-200 text-slate-900" : "bg-zinc-900 border-zinc-800 text-white"
+                  }`}
+                >
+                  <button
+                    onClick={() => setShowCourseForm(false)}
+                    className={`absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer border ${
+                      theme === "light" ? "bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-800" : "bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2.5 rounded-xl bg-brand-primary/10 text-brand-primary">
+                      <GraduationCap className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-lg tracking-tight">{editingCourse ? "Edit Course Syllabus" : "Create Training Program"}</h3>
+                      <p className={`text-xs ${theme === "light" ? "text-slate-500" : "text-zinc-500"}`}>Upload banner image, title, and optional course details.</p>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleSaveCourse} className="space-y-4 mt-4">
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                        Course Title <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. UI/UX & Web Development Course"
+                        value={courseTitle}
+                        onChange={e => setCourseTitle(e.target.value)}
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold ${
+                          theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                        }`}
+                      />
+                    </div>
+
+                    <ImageUploadField
+                      label="Upload Course Banner / Design (Optional)"
+                      value={courseImage}
+                      onChange={setCourseImage}
+                      placeholder="https://images.unsplash.com/photo-1517694712202-14dd9538aa97"
+                      theme={theme}
+                    />
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                          Pricing <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. ₦150,000 / Free"
+                          value={coursePrice}
+                          onChange={e => setCoursePrice(e.target.value)}
+                          className={`w-full px-3 py-2 border rounded-xl text-xs font-semibold ${
+                            theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                          Duration <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. 12 Weeks"
+                          value={courseDuration}
+                          onChange={e => setCourseDuration(e.target.value)}
+                          className={`w-full px-3 py-2 border rounded-xl text-xs font-semibold ${
+                            theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                          Level <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                        </label>
+                        <select
+                          value={courseLevel}
+                          onChange={e => setCourseLevel(e.target.value)}
+                          className={`w-full px-3 py-2 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold ${
+                            theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                          }`}
+                        >
+                          <option value="Beginner">Beginner</option>
+                          <option value="Intermediate">Intermediate</option>
+                          <option value="Advanced">Advanced</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                          Start Date <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Next Batch / Open"
+                          value={courseCohort}
+                          onChange={e => setCourseCohort(e.target.value)}
+                          className={`w-full px-3 py-2 border rounded-xl text-xs font-semibold ${
+                            theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                          Available Spots <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                        </label>
+                        <input
+                          type="number"
+                          placeholder="15"
+                          value={courseSpots}
+                          onChange={e => setCourseSpots(parseInt(e.target.value) || 15)}
+                          className={`w-full px-3 py-2 border rounded-xl text-xs font-semibold ${
+                            theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                          }`}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                        Program Overview <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                      </label>
+                      <textarea
+                        rows={2}
+                        placeholder="Summary of learning outcomes (optional)..."
+                        value={courseDesc}
+                        onChange={e => setCourseDesc(e.target.value)}
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold resize-none ${
+                          theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                        Syllabus Modules <span className="text-xs font-normal text-slate-400">(Optional - One per line)</span>
+                      </label>
+                      <textarea
+                        rows={3}
+                        placeholder="Module 1: Design Fundamentals&#10;Module 2: Practical Projects"
+                        value={courseSyllabus}
+                        onChange={e => setCourseSyllabus(e.target.value)}
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold resize-none ${
+                          theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                        Tags / Prerequisites <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Figma, React, UI/UX"
+                        value={courseTags}
+                        onChange={e => setCourseTags(e.target.value)}
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold ${
+                          theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                        }`}
+                      />
+                    </div>
+
+                    <div className="flex gap-3 pt-4 border-t border-inherit">
+                      <button
+                        type="button"
+                        onClick={() => setShowCourseForm(false)}
+                        className={`w-1/2 py-2.5 border rounded-xl text-xs font-bold uppercase transition-colors cursor-pointer ${
+                          theme === "light" ? "border-slate-200 text-slate-500 hover:bg-slate-50" : "border-zinc-800 text-zinc-400 hover:text-white"
+                        }`}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="w-1/2 py-2.5 bg-brand-primary hover:bg-brand-primary/95 text-white rounded-xl text-xs font-bold uppercase tracking-wider shadow-md transition-all cursor-pointer"
+                      >
+                        {editingCourse ? "Update Program" : "Save Program"}
+                      </button>
+                    </div>
+                  </form>
+                </motion.div>
+              </div>
+            )}
+
+            {/* PORTFOLIO PROJECT / DESIGN MODAL FORM */}
+            {showProjectForm && (
+              <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setShowProjectForm(false)}
+                  className="absolute inset-0 bg-black/70 backdrop-blur-md"
+                />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                  className={`relative w-full max-w-2xl max-h-[85vh] overflow-y-auto border rounded-[2rem] shadow-2xl z-10 p-6 sm:p-8 transition-all ${
+                    theme === "light" ? "bg-white border-slate-200 text-slate-900" : "bg-zinc-900 border-zinc-800 text-white"
+                  }`}
+                >
+                  <button
+                    onClick={() => setShowProjectForm(false)}
+                    className={`absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer border ${
+                      theme === "light" ? "bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-800" : "bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2.5 rounded-xl bg-brand-primary/10 text-brand-primary">
+                      <Layout className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-lg tracking-tight">{editingProject ? "Edit Design / Portfolio Showcase" : "Add Design / Portfolio Showcase"}</h3>
+                      <p className={`text-xs ${theme === "light" ? "text-slate-500" : "text-zinc-500"}`}>Upload design, enter title, and optional description.</p>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleSaveProject} className="space-y-4 mt-4">
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                        Design / Item Title <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Modern Brand Identity / E-Commerce Website Design"
+                        value={projectTitle}
+                        onChange={e => setProjectTitle(e.target.value)}
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold ${
+                          theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                        }`}
+                      />
+                    </div>
+
+                    <ImageUploadField
+                      label="Upload Design / Preview Image (Optional)"
+                      value={projectImage}
+                      onChange={setProjectImage}
+                      placeholder="https://images.unsplash.com/photo-1460925895917-afdab827c52f"
+                      theme={theme}
+                    />
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                          Category <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                        </label>
+                        <select
+                          value={projectCategory}
+                          disabled={currentUser?.role === "Designer" || currentUser?.role === "Developer"}
+                          onChange={e => setProjectCategory(e.target.value)}
+                          className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold ${
+                            theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                          }`}
+                        >
+                          <option value="Graphic Designs">Graphic Designs</option>
+                          <option value="Websites">Websites</option>
+                          <option value="Mobile Apps">Mobile Apps</option>
+                          <option value="Cloud Engineering">Cloud Engineering</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                          Live Project Link <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="https://example.com"
+                          value={projectLink}
+                          onChange={e => setProjectLink(e.target.value)}
+                          className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold ${
+                            theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                          }`}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                        Technologies / Tools Used <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Figma, Photoshop, React, Tailwind"
+                        value={projectTags}
+                        onChange={e => setProjectTags(e.target.value)}
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold ${
+                          theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                        Small Description <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                      </label>
+                      <textarea
+                        rows={2}
+                        placeholder="Brief summary or description of the design (optional)..."
+                        value={projectDesc}
+                        onChange={e => setProjectDesc(e.target.value)}
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold resize-none ${
+                          theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                        Full Case Study / Details <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                      </label>
+                      <textarea
+                        rows={3}
+                        placeholder="Detailed design breakdown or project case study (optional)..."
+                        value={projectLongDesc}
+                        onChange={e => setProjectLongDesc(e.target.value)}
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold resize-none ${
+                          theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                        }`}
+                      />
+                    </div>
+
+                    <div className="flex gap-3 pt-4 border-t border-inherit">
+                      <button
+                        type="button"
+                        onClick={() => setShowProjectForm(false)}
+                        className={`w-1/2 py-2.5 border rounded-xl text-xs font-bold uppercase transition-colors cursor-pointer ${
+                          theme === "light" ? "border-slate-200 text-slate-500 hover:bg-slate-50" : "border-zinc-800 text-zinc-400 hover:text-white"
+                        }`}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="w-1/2 py-2.5 bg-brand-primary hover:bg-brand-primary/95 text-white rounded-xl text-xs font-bold uppercase tracking-wider shadow-md transition-all cursor-pointer"
+                      >
+                        {editingProject ? "Update Item" : "Publish Item"}
+                      </button>
+                    </div>
+                  </form>
+                </motion.div>
+              </div>
+            )}
+
+            {/* SERVICE MODAL FORM */}
+            {showServiceForm && (
+              <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setShowServiceForm(false)}
+                  className="absolute inset-0 bg-black/70 backdrop-blur-md"
+                />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 1, y: 0 }}
+                  className={`relative w-full max-w-2xl max-h-[85vh] overflow-y-auto border rounded-[2rem] shadow-2xl z-10 p-6 sm:p-8 transition-all ${
+                    theme === "light" ? "bg-white border-slate-200 text-slate-900" : "bg-zinc-900 border-zinc-800 text-white"
+                  }`}
+                >
+                  <button
+                    onClick={() => setShowServiceForm(false)}
+                    className={`absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer border ${
+                      theme === "light" ? "bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-800" : "bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2.5 rounded-xl bg-brand-primary/10 text-brand-primary">
+                      <Layers className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-lg tracking-tight">{editingService ? "Edit Service Capability" : "Add Service Offering"}</h3>
+                      <p className={`text-xs ${theme === "light" ? "text-slate-500" : "text-zinc-500"}`}>Upload design image, title, icon, and optional description.</p>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleSaveService} className="space-y-4 mt-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                          Service Title <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Brand & Graphic Design"
+                          value={serviceTitle}
+                          onChange={e => setServiceTitle(e.target.value)}
+                          className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold ${
+                            theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                          Icon Name <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Layout, Cpu, Code, Server"
+                          value={serviceIcon}
+                          onChange={e => setServiceIcon(e.target.value)}
+                          className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold ${
+                            theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                          }`}
+                        />
+                      </div>
+                    </div>
+
+                    <ImageUploadField
+                      label="Upload Service Header Image / Design (Optional)"
+                      value={serviceImage}
+                      onChange={setServiceImage}
+                      placeholder="https://images.unsplash.com/photo-1460925895917-afdab827c52f"
+                      theme={theme}
+                    />
+
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                        Service Description <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                      </label>
+                      <textarea
+                        rows={3}
+                        placeholder="Small description of the service (optional)..."
+                        value={serviceDesc}
+                        onChange={e => setServiceDesc(e.target.value)}
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold resize-none ${
+                          theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                        Key Deliverables & Features <span className="text-xs font-normal text-slate-400">(Optional - One per line)</span>
+                      </label>
+                      <textarea
+                        rows={3}
+                        placeholder="Key feature 1&#10;Key feature 2"
+                        value={serviceFeatures}
+                        onChange={e => setServiceFeatures(e.target.value)}
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs focus:border-brand-primary focus:outline-none font-semibold resize-none ${
+                          theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                        }`}
+                      />
+                    </div>
+
+                    <div className="flex gap-3 pt-4 border-t border-inherit">
+                      <button
+                        type="button"
+                        onClick={() => setShowServiceForm(false)}
+                        className={`w-1/2 py-2.5 border rounded-xl text-xs font-bold uppercase transition-colors cursor-pointer ${
+                          theme === "light" ? "border-slate-200 text-slate-500 hover:bg-slate-50" : "border-zinc-800 text-zinc-400 hover:text-white"
+                        }`}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="w-1/2 py-2.5 bg-brand-primary hover:bg-brand-primary/95 text-white rounded-xl text-xs font-bold uppercase tracking-wider shadow-md transition-all cursor-pointer"
+                      >
+                        {editingService ? "Update Service" : "Save Service"}
+                      </button>
+                    </div>
+                  </form>
+                </motion.div>
+              </div>
+            )}
+
+            {/* LOG NOTES MODAL */}
             {(editingBooking || editingMessage) && (
               <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
                 <motion.div
@@ -3915,6 +5767,85 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                         )}
                       </button>
                     </div>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+
+            {/* POPUP CONFIRMATION MODAL FOR ITEM DELETION */}
+            {deleteConfirmState.isOpen && (
+              <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setDeleteConfirmState({ isOpen: false, title: "", onConfirm: () => {} })}
+                  className="absolute inset-0 bg-black/70 backdrop-blur-md"
+                />
+
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                  className={`relative w-full max-w-md border rounded-[2rem] shadow-2xl z-10 p-6 sm:p-8 overflow-hidden transition-all ${
+                    theme === "light" ? "bg-white border-slate-200 text-slate-900" : "bg-zinc-900 border-zinc-800 text-white"
+                  }`}
+                >
+                  <button
+                    onClick={() => setDeleteConfirmState({ isOpen: false, title: "", onConfirm: () => {} })}
+                    className={`absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer border ${
+                      theme === "light"
+                        ? "bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-800"
+                        : "bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 flex items-center justify-center shrink-0">
+                      <Trash2 className="w-6 h-6" />
+                    </div>
+                    <div className="space-y-1.5 min-w-0 flex-grow pt-0.5">
+                      <span className="text-[10px] font-black uppercase text-red-500 tracking-widest block">Action Requires Confirmation</span>
+                      <h3 className="font-display font-black text-lg tracking-tight">Confirm Deletion</h3>
+                      <p className="text-xs text-zinc-400 leading-relaxed font-medium">
+                        {deleteConfirmState.title || "Are you sure you want to delete this item? This action cannot be undone."}
+                      </p>
+                      {deleteConfirmState.itemLabel && (
+                        <div className={`mt-3 p-3 rounded-xl border text-xs font-bold truncate ${
+                          theme === "light" ? "bg-slate-50 border-slate-200 text-slate-800" : "bg-zinc-950 border-zinc-800/80 text-zinc-300"
+                        }`}>
+                          {deleteConfirmState.itemLabel}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-6 flex items-center justify-end gap-3 pt-4 border-t border-inherit">
+                    <button
+                      type="button"
+                      onClick={() => setDeleteConfirmState({ isOpen: false, title: "", onConfirm: () => {} })}
+                      className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                        theme === "light" 
+                          ? "bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700" 
+                          : "bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-zinc-300"
+                      }`}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const confirmFn = deleteConfirmState.onConfirm;
+                        setDeleteConfirmState({ isOpen: false, title: "", onConfirm: () => {} });
+                        confirmFn();
+                      }}
+                      className="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase tracking-wider shadow-lg shadow-red-600/20 transition-all cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      <span>Confirm Delete</span>
+                    </button>
                   </div>
                 </motion.div>
               </div>

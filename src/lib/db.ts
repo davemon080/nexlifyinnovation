@@ -15,6 +15,7 @@ import {
 } from "firebase/firestore";
 import { Service, Project, Course, TeamMember, BlogPost, JobOpening } from "../types";
 import { SERVICES, PROJECTS, COURSES, TEAM, BLOGS, JOBS } from "../data";
+import { normalizeProjectCategory } from "./utils";
 
 // Firebase Config from environment variables
 const firebaseConfig = {
@@ -48,6 +49,25 @@ try {
   }
 } catch (error) {
   console.error("Firebase failed to initialize:", error);
+}
+
+export function sanitizeForFirestore<T>(data: T): T {
+  if (data === null || data === undefined) {
+    return data;
+  }
+  if (Array.isArray(data)) {
+    return data.map(item => sanitizeForFirestore(item)) as unknown as T;
+  }
+  if (typeof data === "object" && !(data instanceof Date)) {
+    const cleaned: Record<string, any> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) {
+        cleaned[key] = sanitizeForFirestore(value);
+      }
+    }
+    return cleaned as T;
+  }
+  return data;
 }
 
 export enum OperationType {
@@ -146,8 +166,11 @@ export interface StaffUser {
   id: string;
   name: string;
   email: string;
-  role: "CEO" | "Employee";
+  role: "CEO" | "Employee" | "Manager" | "Developer" | "Designer" | "Content Editor" | "Customer Support";
   createdAt: string;
+  avatar?: string;
+  bio?: string;
+  allowedTabs?: string[];
 }
 
 // PRE-POPULATED MOCK DATA FOR LOCAL STORAGE
@@ -731,7 +754,7 @@ export async function getStaffUsers(): Promise<StaffUser[]> {
   return getLocalCollection<StaffUser>("nexlify_staff");
 }
 
-export async function updateStaffRole(email: string, role: "CEO" | "Employee"): Promise<boolean> {
+export async function updateStaffRole(email: string, role: StaffUser["role"]): Promise<boolean> {
   const staff = getLocalCollection<StaffUser>("nexlify_staff");
   const idx = staff.findIndex(s => s.email.toLowerCase() === email.toLowerCase());
   if (idx !== -1) {
@@ -761,7 +784,84 @@ export async function updateStaffRole(email: string, role: "CEO" | "Employee"): 
   return false;
 }
 
-export async function registerStaffUser(email: string, password: string, name: string, role: "CEO" | "Employee"): Promise<StaffUser | string> {
+export async function updateStaffPermissions(email: string, allowedTabs: string[]): Promise<boolean> {
+  const staff = getLocalCollection<StaffUser>("nexlify_staff");
+  const emailLower = email.trim().toLowerCase();
+  const idx = staff.findIndex(s => s.email.toLowerCase() === emailLower);
+  if (idx !== -1) {
+    staff[idx].allowedTabs = allowedTabs;
+    setLocalCollection("nexlify_staff", staff);
+
+    if (isFirebaseEnabled && db) {
+      try {
+        const querySnapshot = await getDocs(collection(db, "staff_users"));
+        let firestoreId = null;
+        querySnapshot.forEach((doc) => {
+          if (doc.data().email?.toLowerCase() === emailLower) {
+            firestoreId = doc.id;
+          }
+        });
+        if (firestoreId) {
+          await updateDoc(doc(db, "staff_users", firestoreId), { allowedTabs });
+        }
+      } catch (e) {
+        console.error("Firebase staff permissions update error:", e);
+        handleFirestoreError(e, OperationType.UPDATE, "staff_users");
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
+export async function updateStaffProfile(email: string, updates: { avatar?: string; name?: string; bio?: string }): Promise<StaffUser | null> {
+  const staff = getLocalCollection<StaffUser>("nexlify_staff");
+  const emailLower = email.trim().toLowerCase();
+  const idx = staff.findIndex(s => s.email.toLowerCase() === emailLower);
+  let updatedUser: StaffUser | null = null;
+
+  if (idx !== -1) {
+    staff[idx] = { ...staff[idx], ...updates };
+    updatedUser = staff[idx];
+    setLocalCollection("nexlify_staff", staff);
+  } else {
+    let baseUser: StaffUser;
+    if (emailLower === "ceo@nexlify.com") {
+      baseUser = { id: "staff-1", name: "David Simon", email: "ceo@nexlify.com", role: "CEO", createdAt: new Date().toISOString() };
+    } else if (emailLower === "employee@nexlify.com") {
+      baseUser = { id: "staff-2", name: "Israel Ujah", email: "employee@nexlify.com", role: "Employee", createdAt: new Date().toISOString() };
+    } else {
+      baseUser = { id: `staff-${Math.random().toString(36).substr(2, 9)}`, name: email.split("@")[0], email: emailLower, role: "Employee", createdAt: new Date().toISOString() };
+    }
+    updatedUser = { ...baseUser, ...updates };
+    staff.push(updatedUser);
+    setLocalCollection("nexlify_staff", staff);
+  }
+
+  if (isFirebaseEnabled && db) {
+    try {
+      const querySnapshot = await getDocs(collection(db, "staff_users"));
+      let firestoreId: string | null = null;
+      querySnapshot.forEach((doc) => {
+        if (doc.data().email?.toLowerCase() === emailLower) {
+          firestoreId = doc.id;
+        }
+      });
+      if (firestoreId) {
+        await updateDoc(doc(db, "staff_users", firestoreId), sanitizeForFirestore(updates));
+      } else if (updatedUser) {
+        await addDoc(collection(db, "staff_users"), sanitizeForFirestore(updatedUser));
+      }
+    } catch (e) {
+      console.error("Firebase staff profile update error:", e);
+      handleFirestoreError(e, OperationType.UPDATE, "staff_users");
+    }
+  }
+
+  return updatedUser;
+}
+
+export async function registerStaffUser(email: string, password: string, name: string, role: StaffUser["role"]): Promise<StaffUser | string> {
   const emailLower = email.trim().toLowerCase();
   const staff = getLocalCollection<StaffUser>("nexlify_staff");
   
@@ -834,6 +934,42 @@ export async function loginStaffUser(email: string, password: string): Promise<S
   return "Incorrect password for administrative portal.";
 }
 
+export async function deleteStaffUser(email: string): Promise<boolean> {
+  const staff = getLocalCollection<StaffUser>("nexlify_staff");
+  const filtered = staff.filter(s => s.email.toLowerCase() !== email.toLowerCase());
+  setLocalCollection("nexlify_staff", filtered);
+
+  // Remove stored password if exists
+  try {
+    const authMapStr = localStorage.getItem("nexlify_auth_passwords") || "{}";
+    const authMap = JSON.parse(authMapStr);
+    delete authMap[email.toLowerCase()];
+    localStorage.setItem("nexlify_auth_passwords", JSON.stringify(authMap));
+  } catch (e) {
+    console.error(e);
+  }
+
+  if (isFirebaseEnabled && db) {
+    try {
+      // Find by email in firestore and delete
+      const querySnapshot = await getDocs(collection(db, "staff_users"));
+      let firestoreId = null;
+      querySnapshot.forEach((doc) => {
+        if (doc.data().email.toLowerCase() === email.toLowerCase()) {
+          firestoreId = doc.id;
+        }
+      });
+      if (firestoreId) {
+        await deleteDoc(doc(db, "staff_users", firestoreId));
+      }
+    } catch (e) {
+      console.error("Firebase staff delete error:", e);
+      handleFirestoreError(e, OperationType.DELETE, "staff_users");
+    }
+  }
+  return true;
+}
+
 // ==================== CMS DYNAMIC WEB OPERATIONS ====================
 
 // 7. SERVICES CMS
@@ -847,9 +983,10 @@ export async function getServices(): Promise<Service[]> {
         items.push({ ...doc.data(), id: doc.id } as Service);
       });
       
-      const hasAllRequiredServices = SERVICES.every(s => items.some(item => item.id === s.id));
-      if (items.length > 0 && hasAllRequiredServices) {
-        return items;
+      const canonicalIds = new Set(SERVICES.map(s => s.id));
+      const validItems = items.filter(item => canonicalIds.has(item.id) || item.id.startsWith("srv-"));
+      if (validItems.length > 0 && SERVICES.every(s => validItems.some(item => item.id === s.id))) {
+        return validItems;
       }
       
       // Seed / Re-seed
@@ -863,9 +1000,11 @@ export async function getServices(): Promise<Service[]> {
     }
   }
   const local = getLocalCollection<Service>("nexlify_services");
-  const hasAllRequiredServicesLocal = SERVICES.every(s => local.some(item => item.id === s.id));
-  if (local.length > 0 && hasAllRequiredServicesLocal) {
-    return local;
+  const canonicalIds = new Set(SERVICES.map(s => s.id));
+  const validLocal = local.filter(s => canonicalIds.has(s.id) || s.id.startsWith("srv-"));
+  if (validLocal.length > 0 && SERVICES.every(s => validLocal.some(item => item.id === s.id))) {
+    setLocalCollection("nexlify_services", validLocal);
+    return validLocal;
   }
   setLocalCollection("nexlify_services", SERVICES);
   return SERVICES;
@@ -916,7 +1055,12 @@ export async function getProjects(): Promise<Project[]> {
       const querySnapshot = await getDocs(q);
       const items: Project[] = [];
       querySnapshot.forEach((doc) => {
-        items.push({ ...doc.data(), id: doc.id } as Project);
+        const d = doc.data() as Project;
+        items.push({
+          ...d,
+          id: doc.id,
+          category: normalizeProjectCategory(d.category)
+        });
       });
       if (items.length > 0) {
         return items.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
@@ -924,38 +1068,58 @@ export async function getProjects(): Promise<Project[]> {
       
       // Seed
       for (const item of PROJECTS) {
-        await setDoc(doc(db, "projects", item.id), item);
+        const normalizedItem = { ...item, category: normalizeProjectCategory(item.category) };
+        await setDoc(doc(db, "projects", item.id), normalizedItem);
       }
-      return PROJECTS;
+      return PROJECTS.map(p => ({ ...p, category: normalizeProjectCategory(p.category) }));
     } catch (e) {
       console.error("Firebase fetch projects error:", e);
       handleFirestoreError(e, OperationType.LIST, "projects");
     }
   }
   const local = getLocalCollection<Project>("nexlify_projects");
-  const merged = local.length > 0 ? local : PROJECTS;
-  return [...merged].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  let merged: Project[] = [];
+  if (!local || local.length === 0) {
+    merged = PROJECTS;
+  } else {
+    const existingIds = new Set(local.map(p => p.id));
+    const missingSeedProjects = PROJECTS.filter(p => !existingIds.has(p.id));
+    merged = [...local, ...missingSeedProjects];
+  }
+  
+  const normalizedList = merged.map(p => ({
+    ...p,
+    category: normalizeProjectCategory(p.category)
+  }));
+  
+  setLocalCollection("nexlify_projects", normalizedList);
+  return normalizedList.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 }
 
 export async function saveProject(project: Project): Promise<Project> {
+  const normalizedProject: Project = {
+    ...project,
+    category: normalizeProjectCategory(project.category)
+  };
+
   if (isFirebaseEnabled && db) {
     try {
-      await setDoc(doc(db, "projects", project.id), project);
-      return project;
+      await setDoc(doc(db, "projects", normalizedProject.id), normalizedProject);
+      return normalizedProject;
     } catch (e) {
       console.error("Firebase save project error:", e);
-      handleFirestoreError(e, OperationType.WRITE, `projects/${project.id}`);
+      handleFirestoreError(e, OperationType.WRITE, `projects/${normalizedProject.id}`);
     }
   }
   const list = getLocalCollection<Project>("nexlify_projects");
-  const idx = list.findIndex(p => p.id === project.id);
+  const idx = list.findIndex(p => p.id === normalizedProject.id);
   if (idx !== -1) {
-    list[idx] = project;
+    list[idx] = normalizedProject;
   } else {
-    list.unshift(project);
+    list.unshift(normalizedProject);
   }
   setLocalCollection("nexlify_projects", list);
-  return project;
+  return normalizedProject;
 }
 
 export async function deleteProject(id: string): Promise<boolean> {
@@ -1228,7 +1392,7 @@ export async function getTeamMembers(): Promise<TeamMember[]> {
       
       // Seed
       for (const item of TEAM) {
-        await setDoc(doc(db, "team_members", item.name.replace(/\s+/g, "_")), item);
+        await setDoc(doc(db, "team_members", item.name.replace(/\s+/g, "_")), sanitizeForFirestore(item));
       }
       return TEAM;
     } catch (e) {
@@ -1241,13 +1405,14 @@ export async function getTeamMembers(): Promise<TeamMember[]> {
 }
 
 export async function saveTeamMember(member: TeamMember): Promise<TeamMember> {
+  const sanitized = sanitizeForFirestore(member);
   if (isFirebaseEnabled && db) {
     try {
-      await setDoc(doc(db, "team_members", member.name.replace(/\s+/g, "_")), member);
+      await setDoc(doc(db, "team_members", sanitized.name.replace(/\s+/g, "_")), sanitized);
       return member;
     } catch (e) {
       console.error("Firebase save team error:", e);
-      handleFirestoreError(e, OperationType.WRITE, `team_members/${member.name.replace(/\s+/g, "_")}`);
+      handleFirestoreError(e, OperationType.WRITE, `team_members/${sanitized.name.replace(/\s+/g, "_")}`);
     }
   }
   const list = getLocalCollection<TeamMember>("nexlify_team");

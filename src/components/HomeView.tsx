@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { ArrowRight, Code, Palette, Smartphone, Sparkles, CheckCircle2, Shield, Zap, Globe, MessageSquare } from "lucide-react";
 import { SERVICES, PROJECTS, PROCESS_STAGES, TECH_STACK, BLOGS, COURSES } from "../data";
-import { ViewType } from "../types";
+import { getServices } from "../lib/db";
+import { Service, ViewType } from "../types";
 import HeroServiceShowcase from "./HeroServiceShowcase";
 
 interface HomeViewProps {
@@ -11,6 +12,17 @@ interface HomeViewProps {
 }
 
 export default function HomeView({ setView, setSelectedService }: HomeViewProps) {
+  const [servicesList, setServicesList] = useState<Service[]>(SERVICES);
+
+  useEffect(() => {
+    getServices()
+      .then(list => {
+        if (list && list.length > 0) {
+          setServicesList(list);
+        }
+      })
+      .catch(err => console.error("Error loading services in HomeView:", err));
+  }, []);
   // Map icons from string to Lucide component
   const getIcon = (name: string) => {
     switch (name) {
@@ -162,7 +174,7 @@ export default function HomeView({ setView, setSelectedService }: HomeViewProps)
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {SERVICES.slice(0, 3).map((s) => {
+            {servicesList.slice(0, 3).map((s) => {
               const Icon = getIcon(s.icon);
               return (
                 <div 

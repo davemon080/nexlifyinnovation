@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { ArrowLeft, Clock, Code, LayoutGrid, CheckCircle2, MessageSquare, ExternalLink, Search, X, Monitor, Palette } from "lucide-react";
 import { getProjects } from "../lib/db";
+import { normalizeProjectCategory } from "../lib/utils";
 import { Project } from "../types";
 import GraphicDesignViewer from "./GraphicDesignViewer";
 import { Helmet } from "react-helmet-async";
@@ -72,19 +73,10 @@ export default function PortfolioView() {
 
   const categories = ["All", "Websites", "Graphic Designs"];
 
-  const normalizedProjects = (projectsList || []).map(p => {
-    let cat = p.category;
-    if (cat === "Web Development" || cat === "Web Platform" || cat === "Software") {
-      cat = "Websites";
-    } else if (cat === "Brand Identity" || cat === "Mobile Apps" || cat === "Mobile App" || cat === "Corporate Solution") {
-      cat = "Graphic Designs";
-    }
-    // Safeguard to only allow Websites and Graphic Designs
-    if (cat !== "Websites" && cat !== "Graphic Designs") {
-      cat = "Websites"; // default fallback
-    }
-    return { ...p, category: cat };
-  });
+  const normalizedProjects = (projectsList || []).map(p => ({
+    ...p,
+    category: normalizeProjectCategory(p.category)
+  }));
 
   const filteredProjects = normalizedProjects.filter(p => {
     const matchesCategory = filterCategory === "All" || p.category === filterCategory;
@@ -344,7 +336,7 @@ export default function PortfolioView() {
 
             <div className="space-y-8">
               {/* Immersive Case Study Banner Header */}
-              <div className="relative aspect-video rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/5">
+              <div className="relative aspect-video lg:aspect-[21/9] lg:h-[450px] rounded-[1.5rem] sm:rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/5">
                 <img
                   src={selectedProject.image}
                   alt={selectedProject.title}

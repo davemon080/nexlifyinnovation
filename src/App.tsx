@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { 
+  Home,
+  Layers,
+  Briefcase,
+  Users,
+  GraduationCap,
+  BookOpen,
+  UserPlus,
+  Mail,
+  Calendar,
   ArrowRight, 
   Menu, 
   X, 
@@ -7,7 +16,6 @@ import {
   Facebook, 
   Twitter, 
   Linkedin,
-  Mail,
   Phone,
   MapPin,
   Sparkles
@@ -173,15 +181,15 @@ export default function App() {
     };
   }, []);
 
-  const navLinks: { name: string; value: ViewType }[] = [
-    { name: "Home", value: "home" },
-    { name: "Services", value: "services" },
-    { name: "Portfolio", value: "portfolio" },
-    { name: "About Us", value: "about" },
-    { name: "Training", value: "training" },
-    { name: "Insights", value: "blog" },
-    { name: "Careers", value: "careers" },
-    { name: "Contact", value: "contact" }
+  const navLinks: { name: string; value: ViewType; icon: React.ElementType }[] = [
+    { name: "Home", value: "home", icon: Home },
+    { name: "Services", value: "services", icon: Layers },
+    { name: "Portfolio", value: "portfolio", icon: Briefcase },
+    { name: "About Us", value: "about", icon: Users },
+    { name: "Training", value: "training", icon: GraduationCap },
+    { name: "Insights", value: "blog", icon: BookOpen },
+    { name: "Careers", value: "careers", icon: UserPlus },
+    { name: "Contact", value: "contact", icon: Mail }
   ];
 
   if (view === "admin-dashboard") {
@@ -254,21 +262,18 @@ export default function App() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100 selection:bg-brand-primary selection:text-white flex flex-col">
       <SEO title={seoData.title} description={seoData.description} />
 
-      {/* --- GLASSMORPHIC NAV BAR --- */}
-      <nav 
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-          isScrolled || isMenuOpen ? "bg-zinc-950/85 backdrop-blur-md border-b border-zinc-900 py-3" : "bg-transparent py-5"
-        }`}
-      >
-        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
+      {/* --- FLOATING NAV ELEMENTS (NO FULL HEADER BAR) --- */}
+      <nav className="fixed top-0 left-0 right-0 z-50 pointer-events-none py-4 px-4 sm:px-8">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          {/* Logo & Brand Name Floating Pill */}
           <div 
-            className="flex items-center gap-2 cursor-pointer select-none"
+            className="pointer-events-auto flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-zinc-950/85 border border-zinc-800/80 backdrop-blur-md shadow-xl cursor-pointer select-none hover:border-brand-primary/40 transition-all"
             onClick={() => {
               setView("home");
               setIsMenuOpen(false);
             }}
           >
-            <div className="w-9 h-9 bg-zinc-900 rounded-xl flex items-center justify-center overflow-hidden border border-white/5 shadow-lg">
+            <div className="w-7 h-7 bg-zinc-900 rounded-full flex items-center justify-center overflow-hidden border border-white/10 shadow-sm shrink-0">
               <img 
                 src="https://iili.io/Bp0LZ3Q.jpg" 
                 alt="Nexlify Logo" 
@@ -276,77 +281,94 @@ export default function App() {
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
                   e.currentTarget.parentElement!.innerHTML = 'N';
-                  e.currentTarget.parentElement!.className = "w-9 h-9 bg-brand-primary rounded-xl flex items-center justify-center font-bold text-base text-white border border-white/10";
+                  e.currentTarget.parentElement!.className = "w-7 h-7 bg-brand-primary rounded-full flex items-center justify-center font-bold text-xs text-white border border-white/10";
                 }}
               />
             </div>
-            <span className="font-display font-bold text-lg tracking-tight">
+            <span className="font-display font-bold text-xs sm:text-sm tracking-tight text-white">
               Nexlify <span className="text-brand-primary">Innovation</span>
             </span>
           </div>
 
-          {/* Desktop Nav links */}
-          <div className="hidden lg:flex items-center gap-6">
-            {navLinks.map((link) => (
-              <button
-                key={link.value}
-                onClick={() => setView(link.value)}
-                className={`text-xs font-bold uppercase tracking-wider transition-all hover:text-white ${
-                  view === link.value ? "text-brand-primary" : "text-zinc-400"
-                }`}
-              >
-                {link.name}
-              </button>
-            ))}
+          {/* Desktop Nav links Floating Capsule */}
+          <div className="pointer-events-auto hidden lg:flex items-center gap-1 bg-zinc-950/85 border border-zinc-800/80 rounded-full p-1 shadow-xl backdrop-blur-md">
+            {navLinks.map((link) => {
+              const LinkIcon = link.icon;
+              const isActive = view === link.value;
+              return (
+                <button
+                  key={link.value}
+                  onClick={() => setView(link.value)}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer whitespace-nowrap ${
+                    isActive 
+                      ? "bg-brand-primary text-white shadow-sm" 
+                      : "text-zinc-400 hover:text-white hover:bg-zinc-900/80"
+                  }`}
+                >
+                  <LinkIcon className={`w-3 h-3 ${isActive ? "text-white" : "text-zinc-400"}`} />
+                  <span>{link.name}</span>
+                </button>
+              );
+            })}
             <button
               onClick={() => setView("book-consultation")}
-              className="bg-brand-primary hover:bg-brand-primary/95 text-white px-5 py-2.5 rounded-full text-xs font-bold uppercase tracking-wide transition-all shadow-md shadow-brand-primary/10 hover:scale-[1.02]"
+              className="bg-gradient-to-r from-brand-primary to-brand-secondary hover:opacity-95 text-white px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider transition-all shadow-md cursor-pointer flex items-center gap-1 whitespace-nowrap ml-0.5"
             >
-              Consult Now
+              <Calendar className="w-3 h-3" />
+              <span>Consult Now</span>
             </button>
           </div>
 
-          {/* Mobile Hamburguer Menu Trigger */}
+          {/* Mobile Hamburger Menu Trigger Floating Button */}
           <button 
-            className="lg:hidden text-zinc-400 hover:text-white p-2"
+            className="pointer-events-auto lg:hidden p-2.5 rounded-full bg-zinc-950/85 border border-zinc-800/80 backdrop-blur-md text-zinc-300 hover:text-white shadow-xl transition-all"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
+            aria-label="Toggle Navigation Menu"
           >
             {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
 
-        {/* Mobile Full Screen Menu */}
+        {/* Mobile Floating Dropdown Menu */}
         <AnimatePresence>
           {isMenuOpen && (
             <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="lg:hidden bg-zinc-950 border-b border-zinc-900 overflow-hidden"
+              initial={{ opacity: 0, scale: 0.95, y: -10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: -10 }}
+              className="pointer-events-auto lg:hidden mt-3 max-w-md mx-auto bg-zinc-950/95 backdrop-blur-2xl border border-zinc-800 rounded-2xl p-4 shadow-2xl overflow-hidden"
             >
-              <div className="flex flex-col p-6 gap-4">
-                {navLinks.map((link) => (
-                  <button
-                    key={link.value}
-                    onClick={() => {
-                      setView(link.value);
-                      setIsMenuOpen(false);
-                    }}
-                    className={`text-lg font-bold text-left py-1.5 border-b border-zinc-900 transition-colors ${
-                      view === link.value ? "text-brand-primary" : "text-zinc-300 hover:text-white"
-                    }`}
-                  >
-                    {link.name}
-                  </button>
-                ))}
+              <div className="flex flex-col p-5 gap-2">
+                {navLinks.map((link) => {
+                  const LinkIcon = link.icon;
+                  const isActive = view === link.value;
+                  return (
+                    <button
+                      key={link.value}
+                      onClick={() => {
+                        setView(link.value);
+                        setIsMenuOpen(false);
+                      }}
+                      className={`flex items-center gap-3 text-xs font-bold text-left py-2.5 px-4 rounded-xl transition-all uppercase tracking-wider ${
+                        isActive 
+                          ? "bg-brand-primary/15 text-brand-primary border border-brand-primary/30" 
+                          : "text-zinc-300 hover:text-white hover:bg-zinc-900/60 border border-zinc-900/40"
+                      }`}
+                    >
+                      <LinkIcon className={`w-4 h-4 ${isActive ? "text-brand-primary" : "text-zinc-500"}`} />
+                      <span>{link.name}</span>
+                    </button>
+                  );
+                })}
                 <button
                   onClick={() => {
                     setView("book-consultation");
                     setIsMenuOpen(false);
                   }}
-                  className="bg-brand-primary text-white p-4 rounded-xl text-center font-bold shadow-lg mt-2 text-sm uppercase tracking-wider"
+                  className="bg-brand-primary text-white p-3.5 rounded-xl text-center font-bold shadow-lg mt-2 text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  Book Consultation
+                  <Calendar className="w-4 h-4" />
+                  <span>Book Consultation</span>
                 </button>
               </div>
             </motion.div>

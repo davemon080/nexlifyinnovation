@@ -61,7 +61,7 @@ export interface TeamMember {
   role: string;
   image: string;
   bio: string;
-  socials: {
+  socials?: {
     twitter?: string;
     linkedin?: string;
     instagram?: string;
@@ -76,7 +76,7 @@ export interface BlogPost {
   content: string;
   category: string;
   date: string;
-  readTime: string;
+  readTime?: string;
   image: string;
   author: {
     name: string;

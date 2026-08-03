@@ -116,6 +116,15 @@ export default function BookConsultationView() {
     if (userData.name && userData.email && userData.whatsapp) {
       setIsSubmitting(true);
       try {
+        // Real-time final validation against clashes right before saving
+        const isBooked = isSlotBooked(selectedDate, selectedTime);
+        if (isBooked) {
+          alert("Safety Alert: This specific time slot was just booked by another client. Please select a different slot.");
+          setStep(2);
+          setIsSubmitting(false);
+          return;
+        }
+
         await saveConsultation({
           name: userData.name,
           email: userData.email,
@@ -534,7 +543,7 @@ export default function BookConsultationView() {
                       className="w-full py-4 mt-2 bg-brand-primary hover:bg-brand-primary/95 text-white rounded-2xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-lg shadow-brand-primary/15 transition-all disabled:opacity-50"
                     >
                       {isSubmitting ? (
-                        <>Saving Booking <Loader2 className="w-4 h-4 animate-spin" /></>
+                        <>Consulting... <Loader2 className="w-4 h-4 animate-spin" /></>
                       ) : (
                         <>Book Free Session <ArrowRight className="w-4 h-4" /></>
                       )}
