@@ -50,7 +50,13 @@ import {
   ChevronDown,
   ChevronUp,
   Key,
-  HelpCircle
+  HelpCircle,
+  Camera,
+  Upload,
+  Image as ImageIcon,
+  Eye,
+  RefreshCw,
+  Award
 } from "lucide-react";
 import { 
   Consultation, 
@@ -94,7 +100,18 @@ import {
   getTeamMembers,
   saveTeamMember,
   deleteTeamMember,
-  AboutPageData
+  AboutPageData,
+  getCachedConsultations,
+  getCachedContactMessages,
+  getCachedJobApplications,
+  getCachedStaffUsers,
+  getCachedServices,
+  getCachedProjects,
+  getCachedCourses,
+  getCachedBlogs,
+  getCachedJobs,
+  getCachedAboutPageData,
+  getCachedTeamMembers
 } from "../lib/db";
 import { Service, Project, Course, TeamMember, BlogPost, JobOpening } from "../types";
 import { normalizeProjectCategory } from "../lib/utils";
@@ -312,7 +329,6 @@ export const getDefaultTabsForRole = (role: StaffUser["role"] | string): string[
 };
 
 export const isTabPermitted = (tabId: string, role: string, allowedTabs?: string[]) => {
-  if (tabId === "overview" || tabId === "my_profile" || tabId === "insights_cms") return true;
   if (role === "CEO") return true;
 
   if (allowedTabs && Array.isArray(allowedTabs)) {
@@ -460,11 +476,10 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
   const [authLoading, setAuthLoading] = useState(false);
 
   // Dashboard Data State
-  const [consultations, setConsultations] = useState<Consultation[]>([]);
-  const [messages, setMessages] = useState<ContactMessage[]>([]);
-  const [applications, setApplications] = useState<JobApplication[]>([]);
-  const [staffList, setStaffList] = useState<StaffUser[]>([]);
-  const [dataLoading, setDataLoading] = useState(false);
+  const [consultations, setConsultations] = useState<Consultation[]>(() => getCachedConsultations());
+  const [messages, setMessages] = useState<ContactMessage[]>(() => getCachedContactMessages());
+  const [applications, setApplications] = useState<JobApplication[]>(() => getCachedJobApplications());
+  const [staffList, setStaffList] = useState<StaffUser[]>(() => getCachedStaffUsers());
   const [dbStatus, setDbStatus] = useState(false);
 
   // Notifications State
@@ -513,6 +528,54 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
   const [profileBio, setProfileBio] = useState("");
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileSuccess, setProfileSuccess] = useState("");
+
+  const profileFileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const triggerAvatarUpload = () => {
+    profileFileInputRef.current?.click();
+  };
+
+  const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      alert("Please select a valid image file.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+        const MAX_SIZE = 600;
+        if (width > height) {
+          if (width > MAX_SIZE) {
+            height *= MAX_SIZE / width;
+            width = MAX_SIZE;
+          }
+        } else {
+          if (height > MAX_SIZE) {
+            width *= MAX_SIZE / height;
+            height = MAX_SIZE;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+          setProfileAvatar(dataUrl);
+        } else {
+          setProfileAvatar(event.target?.result as string);
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Sync profile state when currentUser updates
   useEffect(() => {
@@ -568,13 +631,13 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
   const [statusFilter, setStatusFilter] = useState("ALL");
 
   // CMS Lists state
-  const [cmsServices, setCmsServices] = useState<Service[]>([]);
-  const [cmsProjects, setCmsProjects] = useState<Project[]>([]);
-  const [cmsCourses, setCmsCourses] = useState<Course[]>([]);
-  const [cmsBlogs, setCmsBlogs] = useState<BlogPost[]>([]);
-  const [cmsJobs, setCmsJobs] = useState<JobOpening[]>([]);
-  const [cmsAboutPage, setCmsAboutPage] = useState<AboutPageData | null>(null);
-  const [cmsTeam, setCmsTeam] = useState<TeamMember[]>([]);
+  const [cmsServices, setCmsServices] = useState<Service[]>(() => getCachedServices());
+  const [cmsProjects, setCmsProjects] = useState<Project[]>(() => getCachedProjects());
+  const [cmsCourses, setCmsCourses] = useState<Course[]>(() => getCachedCourses());
+  const [cmsBlogs, setCmsBlogs] = useState<BlogPost[]>(() => getCachedBlogs());
+  const [cmsJobs, setCmsJobs] = useState<JobOpening[]>(() => getCachedJobs());
+  const [cmsAboutPage, setCmsAboutPage] = useState<AboutPageData | null>(() => getCachedAboutPageData());
+  const [cmsTeam, setCmsTeam] = useState<TeamMember[]>(() => getCachedTeamMembers());
 
   // Interaction Modal States
   const [editingBooking, setEditingBooking] = useState<Consultation | null>(null);
@@ -719,7 +782,7 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
     if (session) {
       try {
         const parsed = JSON.parse(session);
-        if (parsed && parsed.role && parsed.role !== "Employee") {
+        if (parsed && parsed.role) {
           setCurrentUser(parsed);
         } else {
           sessionStorage.removeItem("nexlify_admin_session");
@@ -732,10 +795,9 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
     setDbStatus(isFirebaseConnected());
   }, []);
 
-  // Fetch dashboard data
+  // Fetch dashboard data (unseen background synchronization)
   const loadDashboardData = async () => {
     if (!currentUser) return;
-    setDataLoading(true);
     try {
       const [
         consList, 
@@ -775,13 +837,35 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
       setCmsTeam(tmList);
     } catch (e) {
       console.error("Error loading dashboard metrics:", e);
-    } finally {
-      setDataLoading(false);
     }
   };
 
   useEffect(() => {
     loadDashboardData();
+  }, [currentUser]);
+
+  useEffect(() => {
+    const handlePermissionsUpdated = () => {
+      getStaffUsers().then(latestList => {
+        if (latestList && latestList.length > 0) {
+          setStaffList(latestList);
+          if (currentUser) {
+            const updatedSelf = latestList.find(s => s.email.toLowerCase() === currentUser.email.toLowerCase());
+            if (updatedSelf) {
+              setCurrentUser(updatedSelf);
+              sessionStorage.setItem("nexlify_admin_session", JSON.stringify(updatedSelf));
+            }
+          }
+        }
+      });
+    };
+
+    window.addEventListener("storage", handlePermissionsUpdated);
+    window.addEventListener("nexlify_permissions_updated", handlePermissionsUpdated);
+    return () => {
+      window.removeEventListener("storage", handlePermissionsUpdated);
+      window.removeEventListener("nexlify_permissions_updated", handlePermissionsUpdated);
+    };
   }, [currentUser]);
 
   // Handle Login
@@ -793,11 +877,14 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
       const result = await loginStaffUser(authEmail, authPassword);
       if (typeof result === "string") {
         setAuthError(result);
-      } else if (result.role === "Employee") {
-        setAuthError("Access Denied: General Employee accounts do not have console access privileges.");
       } else {
-        setCurrentUser(result);
-        sessionStorage.setItem("nexlify_admin_session", JSON.stringify(result));
+        const permittedTabs = ALL_SYSTEM_MODULES.filter(m => isTabPermitted(m.id, result.role, result.allowedTabs));
+        if (permittedTabs.length === 0 && result.role === "Employee") {
+          setAuthError("Access Denied: Your employee account has no active page permissions assigned by the CEO.");
+        } else {
+          setCurrentUser(result);
+          sessionStorage.setItem("nexlify_admin_session", JSON.stringify(result));
+        }
       }
     } catch (err) {
       setAuthError("An unexpected system exception occurred.");
@@ -972,21 +1059,27 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
       alert("You cannot modify your own role directly. Safety protection active.");
       return;
     }
+    const defaultNewTabs = getDefaultTabsForRole(targetRole);
+    setStaffList(prev => prev.map(s => s.email.toLowerCase() === email.toLowerCase() ? { ...s, role: targetRole, allowedTabs: defaultNewTabs } : s));
     try {
-      const defaultNewTabs = getDefaultTabsForRole(targetRole);
-      const ok = await updateStaffRole(email, targetRole);
-      if (ok) {
-        await updateStaffPermissions(email, defaultNewTabs);
-        setStaffList(prev => prev.map(s => s.email.toLowerCase() === email.toLowerCase() ? { ...s, role: targetRole, allowedTabs: defaultNewTabs } : s));
-      }
+      await updateStaffRole(email, targetRole);
+      await updateStaffPermissions(email, defaultNewTabs);
+      window.dispatchEvent(new Event("nexlify_permissions_updated"));
     } catch (e) {
-      console.error(e);
+      console.error("Error updating staff role:", e);
     }
   };
 
-  // Action: Toggle Staff Module Permission (CEO ONLY)
+  // Helper: Check if current logged in user has Admin / Manager governance privileges
+  const canManageStaffPermissions = Boolean(
+    currentUser?.role === "CEO" || 
+    currentUser?.role === "Manager" || 
+    isTabPermitted("staff", currentUser?.role || "", currentUser?.allowedTabs)
+  );
+
+  // Action: Toggle Staff Module Permission (Admin)
   const handleToggleStaffPermission = async (staffEmail: string, tabId: string) => {
-    if (currentUser?.role !== "CEO") return;
+    if (!canManageStaffPermissions) return;
     const staffObj = staffList.find(s => s.email.toLowerCase() === staffEmail.toLowerCase());
     if (!staffObj) return;
 
@@ -1000,38 +1093,63 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
       updatedTabs = Array.from(new Set([...currentTabs, tabId]));
     }
 
+    // Immediate optimistic update for zero UI lag
+    setStaffList(prev => prev.map(s => s.email.toLowerCase() === staffEmail.toLowerCase() ? { ...s, allowedTabs: updatedTabs } : s));
+    if (currentUser && staffEmail.toLowerCase() === currentUser.email.toLowerCase()) {
+      const updatedSelf = { ...currentUser, allowedTabs: updatedTabs };
+      setCurrentUser(updatedSelf);
+      sessionStorage.setItem("nexlify_admin_session", JSON.stringify(updatedSelf));
+    }
+
     try {
-      const ok = await updateStaffPermissions(staffEmail, updatedTabs);
-      if (ok) {
-        setStaffList(prev => prev.map(s => s.email.toLowerCase() === staffEmail.toLowerCase() ? { ...s, allowedTabs: updatedTabs } : s));
-        if (staffEmail.toLowerCase() === currentUser.email.toLowerCase()) {
-          const updatedSelf = { ...currentUser, allowedTabs: updatedTabs };
-          setCurrentUser(updatedSelf);
-          sessionStorage.setItem("nexlify_admin_session", JSON.stringify(updatedSelf));
-        }
-      }
+      await updateStaffPermissions(staffEmail, updatedTabs);
+      window.dispatchEvent(new Event("nexlify_permissions_updated"));
     } catch (e) {
       console.error("Error toggling staff permission:", e);
     }
   };
 
-  // Action: Reset Staff Permissions to Role Defaults (CEO ONLY)
+  // Action: Grant All Page Access to Staff Member (Admin)
+  const handleGrantAllStaffPermissions = async (staffEmail: string) => {
+    if (!canManageStaffPermissions) return;
+    const staffObj = staffList.find(s => s.email.toLowerCase() === staffEmail.toLowerCase());
+    if (!staffObj) return;
+
+    const allTabs = Array.from(new Set([...ALL_SYSTEM_MODULES.map(m => m.id), "my_profile"]));
+
+    setStaffList(prev => prev.map(s => s.email.toLowerCase() === staffEmail.toLowerCase() ? { ...s, allowedTabs: allTabs } : s));
+    if (currentUser && staffEmail.toLowerCase() === currentUser.email.toLowerCase()) {
+      const updatedSelf = { ...currentUser, allowedTabs: allTabs };
+      setCurrentUser(updatedSelf);
+      sessionStorage.setItem("nexlify_admin_session", JSON.stringify(updatedSelf));
+    }
+
+    try {
+      await updateStaffPermissions(staffEmail, allTabs);
+      window.dispatchEvent(new Event("nexlify_permissions_updated"));
+    } catch (e) {
+      console.error("Error granting all permissions:", e);
+    }
+  };
+
+  // Action: Reset Staff Permissions to Role Defaults (Admin)
   const handleResetStaffPermissions = async (staffEmail: string) => {
-    if (currentUser?.role !== "CEO") return;
+    if (!canManageStaffPermissions) return;
     const staffObj = staffList.find(s => s.email.toLowerCase() === staffEmail.toLowerCase());
     if (!staffObj) return;
 
     const defaultTabs = getDefaultTabsForRole(staffObj.role);
+
+    setStaffList(prev => prev.map(s => s.email.toLowerCase() === staffEmail.toLowerCase() ? { ...s, allowedTabs: defaultTabs } : s));
+    if (currentUser && staffEmail.toLowerCase() === currentUser.email.toLowerCase()) {
+      const updatedSelf = { ...currentUser, allowedTabs: defaultTabs };
+      setCurrentUser(updatedSelf);
+      sessionStorage.setItem("nexlify_admin_session", JSON.stringify(updatedSelf));
+    }
+
     try {
-      const ok = await updateStaffPermissions(staffEmail, defaultTabs);
-      if (ok) {
-        setStaffList(prev => prev.map(s => s.email.toLowerCase() === staffEmail.toLowerCase() ? { ...s, allowedTabs: defaultTabs } : s));
-        if (staffEmail.toLowerCase() === currentUser.email.toLowerCase()) {
-          const updatedSelf = { ...currentUser, allowedTabs: defaultTabs };
-          setCurrentUser(updatedSelf);
-          sessionStorage.setItem("nexlify_admin_session", JSON.stringify(updatedSelf));
-        }
-      }
+      await updateStaffPermissions(staffEmail, defaultTabs);
+      window.dispatchEvent(new Event("nexlify_permissions_updated"));
     } catch (e) {
       console.error("Error resetting staff permissions:", e);
     }
@@ -1710,13 +1828,12 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                   <p className="text-[11px] font-bold">Email: <span className={theme === "light" ? "text-slate-900" : "text-white"}>ceo@nexlify.com</span></p>
                   <p className="text-[11px] font-bold">Pass: <span className={theme === "light" ? "text-slate-900" : "text-white"}>ceopassword123</span></p>
                 </div>
-                <div className={`p-3 rounded-xl border text-left relative opacity-60 ${
+                <div className={`p-3 rounded-xl border text-left ${
                   theme === "light" ? "bg-slate-50 border-slate-200" : "bg-zinc-950/40 border-zinc-900"
                 }`}>
-                  <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest block mb-1">Employee (No Access)</span>
+                  <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest block mb-1">Employee Role (Granular Access)</span>
                   <p className="text-[11px] font-bold">Email: <span className={theme === "light" ? "text-slate-900" : "text-white"}>employee@nexlify.com</span></p>
                   <p className="text-[11px] font-bold">Pass: <span className={theme === "light" ? "text-slate-900" : "text-white"}>employeepassword123</span></p>
-                  <span className="absolute bottom-1.5 right-2.5 text-[8px] text-red-500 font-bold uppercase tracking-wider">Blocked</span>
                 </div>
               </div>
             </div>
@@ -2509,7 +2626,7 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                       </div>
                       <div>
                         <span className={`text-2xl sm:text-3xl font-black block tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>
-                          {dataLoading ? "..." : consultations.length}
+                          {consultations.length}
                         </span>
                         <span className="text-[10px] text-zinc-500 font-bold block mt-1 uppercase tracking-wider">
                           {consultations.filter(c => c.status === "Pending").length} Pending approval
@@ -2527,7 +2644,7 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                       </div>
                       <div>
                         <span className={`text-2xl sm:text-3xl font-black block tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>
-                          {dataLoading ? "..." : messages.length}
+                          {messages.length}
                         </span>
                         <span className="text-[10px] text-zinc-500 font-bold block mt-1 uppercase tracking-wider">
                           {messages.filter(m => !m.read).length} Unread inquiries
@@ -2545,7 +2662,7 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                       </div>
                       <div>
                         <span className={`text-2xl sm:text-3xl font-black block tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>
-                          {dataLoading ? "..." : applications.length}
+                          {applications.length}
                         </span>
                         <span className="text-[10px] text-zinc-500 font-bold block mt-1 uppercase tracking-wider">
                           {applications.filter(a => a.status === "Shortlisted").length} Shortlisted devs
@@ -2740,15 +2857,8 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                 {/* LIST VIEWS PORTLET */}
                 <div className="space-y-4">
                   
-                  {dataLoading && (
-                    <div className="p-12 text-center text-zinc-500 font-bold text-xs uppercase tracking-widest flex flex-col items-center gap-2">
-                      <Loader2 className="w-6 h-6 text-brand-primary animate-spin" />
-                      Syncing Administrative Node...
-                    </div>
-                  )}
-
                   {/* --- TAB 1: CONSULTATIONS --- */}
-                  {!dataLoading && activeTab === "bookings" && (
+                  {activeTab === "bookings" && (
                     <>
                       {getFilteredConsultations().length === 0 ? (
                         <div className={`p-12 text-center font-bold text-xs border rounded-3xl uppercase tracking-widest ${
@@ -2867,7 +2977,7 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                   )}
 
                   {/* --- TAB 2: CONTACT INBOX --- */}
-                  {!dataLoading && activeTab === "messages" && (
+                  {activeTab === "messages" && (
                     <>
                       {getFilteredMessages().length === 0 ? (
                         <div className={`p-12 text-center font-bold text-xs border rounded-3xl uppercase tracking-widest ${
@@ -2974,7 +3084,7 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                   )}
 
                   {/* --- TAB 3: CAREER APPLICATIONS --- */}
-                  {!dataLoading && activeTab === "careers" && (
+                  {activeTab === "careers" && (
                     <>
                       {getFilteredApplications().length === 0 ? (
                         <div className={`p-12 text-center font-bold text-xs border rounded-3xl uppercase tracking-widest ${
@@ -3084,10 +3194,10 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                     </>
                   )}
 
-                  {/* --- TAB 4: SECURITY & STAFF (CEO ONLY) --- */}
-                  {!dataLoading && activeTab === "staff" && (
+                  {/* --- TAB 4: SECURITY & STAFF --- */}
+                  {activeTab === "staff" && (
                     <>
-                      {currentUser.role !== "CEO" ? (
+                      {!canManageStaffPermissions ? (
                         /* LOCKED VIEW TRIGGER */
                         <div className={`p-8 text-center border rounded-3xl space-y-4 ${
                           theme === "light" ? "bg-slate-100/30 border-slate-200" : "bg-zinc-950/10 border-zinc-900"
@@ -3095,9 +3205,9 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                           <div className="w-12 h-12 bg-amber-500/10 text-amber-500 border border-amber-500/20 rounded-full flex items-center justify-center mx-auto">
                             <Lock className="w-5 h-5 animate-pulse" />
                           </div>
-                          <h4 className={`font-bold text-base ${theme === "light" ? "text-slate-900" : "text-white"}`}>CEO Credentials Required</h4>
+                          <h4 className={`font-bold text-base ${theme === "light" ? "text-slate-900" : "text-white"}`}>Staff Governance Credentials Required</h4>
                           <p className={`text-xs leading-relaxed max-w-xs mx-auto ${theme === "light" ? "text-slate-500" : "text-zinc-500"}`}>
-                            You are currently signed in as an **Employee**. Security logs, database rules, and administrative staff management are restricted to Chief Executive access.
+                            You are currently signed in as {currentUser.name} ({currentUser.role}). Security logs, database rules, and administrative staff management require authorized privileges.
                           </p>
                         </div>
                       ) : (
@@ -3258,62 +3368,66 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                                         <div className="flex items-center justify-between border-t border-inherit pt-2.5 mt-2">
                                           <div>
                                             <span className="text-[10px] font-black uppercase tracking-wider text-brand-primary block">
-                                              Granular Module Access Overrides (CEO Controls)
+                                              Granular Page & Module Access Overrides (Admin Controls)
                                             </span>
                                             <p className="text-[10px] text-zinc-500 font-medium">
-                                              {currentUser?.role === "CEO" 
-                                                ? `Click any module button below to grant or remove access instantly for ${staff.name}.`
-                                                : `Role module access overview for ${staff.name}.`}
+                                              {canManageStaffPermissions 
+                                                ? `Click any page button below to grant or remove access instantly for ${staff.name}.`
+                                                : `Role page access overview for ${staff.name}.`}
                                             </p>
                                           </div>
-                                          {currentUser?.role === "CEO" && staff.allowedTabs && (
-                                            <button
-                                              type="button"
-                                              onClick={() => handleResetStaffPermissions(staff.email)}
-                                              className="text-[9px] font-bold text-amber-500 hover:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 transition-all cursor-pointer shrink-0"
-                                              title="Reset custom page overrides back to role defaults"
-                                            >
-                                              Reset Defaults
-                                            </button>
+                                          {canManageStaffPermissions && (
+                                            <div className="flex items-center gap-1.5 shrink-0">
+                                              <button
+                                                type="button"
+                                                onClick={() => handleGrantAllStaffPermissions(staff.email)}
+                                                className="text-[9px] font-bold text-emerald-500 hover:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 transition-all cursor-pointer"
+                                                title="Grant access to all pages for this staff member"
+                                              >
+                                                Grant All Pages
+                                              </button>
+                                              {staff.allowedTabs && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleResetStaffPermissions(staff.email)}
+                                                  className="text-[9px] font-bold text-amber-500 hover:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 transition-all cursor-pointer"
+                                                  title="Reset custom page overrides back to role defaults"
+                                                >
+                                                  Reset Defaults
+                                                </button>
+                                              )}
+                                            </div>
                                           )}
                                         </div>
 
                                         <div className="flex flex-wrap gap-1.5 pt-1">
                                           {ALL_SYSTEM_MODULES.map((mod) => {
-                                            const isUniversal = mod.id === "overview" || mod.id === "my_profile" || mod.id === "insights_cms";
                                             const isPermitted = isTabPermitted(mod.id, staff.role, staff.allowedTabs);
-                                            const isCeoUser = currentUser?.role === "CEO";
+                                            const isCeoUser = canManageStaffPermissions;
 
                                             return (
                                               <button
                                                 key={mod.id}
                                                 type="button"
-                                                disabled={!isCeoUser || isUniversal}
+                                                disabled={!isCeoUser}
                                                 onClick={() => handleToggleStaffPermission(staff.email, mod.id)}
                                                 className={`text-[9px] font-bold px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 transition-all ${
-                                                  isUniversal
-                                                    ? "bg-blue-500/10 text-blue-500 border-blue-500/20 font-black cursor-default"
-                                                    : isPermitted
-                                                      ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 font-black hover:bg-emerald-500/20 shadow-xs cursor-pointer"
-                                                      : "bg-red-500/5 text-zinc-500 border-red-500/15 hover:bg-red-500/10 hover:text-zinc-400 cursor-pointer"
+                                                  isPermitted
+                                                    ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 font-black hover:bg-emerald-500/20 shadow-xs cursor-pointer active:scale-95"
+                                                    : "bg-red-500/5 text-zinc-500 border-red-500/15 hover:bg-red-500/10 hover:text-zinc-400 cursor-pointer active:scale-95"
                                                 }`}
                                                 title={
-                                                  isUniversal
-                                                    ? "Universal module accessible to all staff members"
-                                                    : isCeoUser
-                                                      ? isPermitted ? `Click to REVOKE ${mod.label} access` : `Click to GRANT ${mod.label} access`
-                                                      : undefined
+                                                  isCeoUser
+                                                    ? isPermitted ? `Click to REVOKE ${mod.label} access` : `Click to GRANT ${mod.label} access`
+                                                    : undefined
                                                 }
                                               >
-                                                {isUniversal ? (
-                                                  <CheckCircle2 className="w-3 h-3 text-blue-500 shrink-0" />
-                                                ) : isPermitted ? (
+                                                {isPermitted ? (
                                                   <Check className="w-3 h-3 text-emerald-500 shrink-0" />
                                                 ) : (
-                                                  <X className="w-3 h-3 text-zinc-400 shrink-0" />
+                                                  <X className="w-3 h-3 text-red-400 shrink-0" />
                                                 )}
                                                 <span>{mod.label}</span>
-                                                {isUniversal && <span className="text-[7px] uppercase font-black px-1 py-0.2 bg-blue-500/20 rounded">Universal</span>}
                                               </button>
                                             );
                                           })}
@@ -3601,94 +3715,142 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                   )}
 
                   {/* --- TAB: MY PROFILE --- */}
-                  {!dataLoading && activeTab === "my_profile" && (
-                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 max-w-4xl">
-                      {/* Page Header */}
-                      <div className="flex items-center justify-between pb-4 border-b border-inherit">
-                        <div>
-                          <h3 className={`font-black text-xl tracking-tight flex items-center gap-2 ${theme === "light" ? "text-slate-900" : "text-white"}`}>
-                            <UserCheck className="w-5 h-5 text-brand-primary" />
-                            My Staff Profile
-                          </h3>
-                          <p className={`text-xs mt-1 font-medium ${theme === "light" ? "text-slate-500" : "text-zinc-400"}`}>
-                            Manage your staff avatar image and details. Updated avatar will automatically be featured on your published corporate insights.
-                          </p>
-                        </div>
-                        <span className="text-xs font-bold px-3 py-1 rounded-full bg-brand-primary/10 text-brand-primary border border-brand-primary/20 uppercase tracking-wider">
-                          {currentUser.role}
-                        </span>
-                      </div>
+                  {activeTab === "my_profile" && (
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 max-w-4xl mx-auto">
+                      {/* Hidden File Input for Camera / Photo Upload */}
+                      <input 
+                        type="file" 
+                        ref={profileFileInputRef} 
+                        accept="image/*" 
+                        onChange={handleAvatarFileChange} 
+                        className="hidden" 
+                      />
 
-                      {profileSuccess && (
-                        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-xs font-bold flex items-center gap-2">
-                          <CheckCircle2 className="w-4 h-4 shrink-0" />
-                          <span>{profileSuccess}</span>
-                        </div>
-                      )}
-
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {/* User Card Preview */}
-                        <div className={`p-6 border rounded-2xl flex flex-col items-center text-center space-y-4 ${
-                          theme === "light" ? "bg-white border-slate-200/80 shadow-sm" : "bg-zinc-900/60 border-zinc-800"
-                        }`}>
-                          <div className="relative group">
-                            <div className="w-24 h-24 rounded-2xl overflow-hidden border-2 border-brand-primary/40 shadow-xl flex items-center justify-center bg-gradient-to-tr from-brand-primary to-indigo-600">
+                      {/* Header Profile Card */}
+                      <div className={`relative overflow-hidden rounded-3xl border p-6 sm:p-8 ${
+                        theme === "light" 
+                          ? "bg-white border-slate-200/80 shadow-md text-slate-900" 
+                          : "bg-zinc-900/80 border-zinc-800 text-white shadow-2xl"
+                      }`}>
+                        {/* Decorative mesh pattern */}
+                        <div className="absolute inset-0 bg-[radial-gradient(#888_1px,transparent_1px)] [background-size:16px_16px] opacity-10 pointer-events-none" />
+                        
+                        <div className="relative z-10 flex flex-col sm:flex-row items-center sm:items-start gap-6 text-center sm:text-left">
+                          {/* Main Profile Picture Avatar with Small Camera Icon Badge */}
+                          <div className="relative group shrink-0">
+                            <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-3xl overflow-hidden border-4 border-brand-primary/30 shadow-2xl flex items-center justify-center bg-gradient-to-tr from-brand-primary via-indigo-600 to-purple-800 relative">
                               {profileAvatar ? (
                                 <img src={profileAvatar} alt={profileName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                               ) : (
-                                <span className="text-white font-black text-3xl">{currentUser.name.charAt(0).toUpperCase()}</span>
+                                <span className="text-white font-black text-4xl">{currentUser.name.charAt(0).toUpperCase()}</span>
                               )}
+
+                              {/* Hover Overlay */}
+                              <div 
+                                onClick={triggerAvatarUpload}
+                                className="absolute inset-0 bg-zinc-950/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white cursor-pointer p-2 rounded-3xl"
+                                title="Click to upload or update picture"
+                              >
+                                <Camera className="w-6 h-6 mb-1 text-brand-primary" />
+                                <span className="text-[10px] font-bold uppercase tracking-wider">Change Photo</span>
+                              </div>
                             </div>
-                            <span className="absolute bottom-1 right-1 w-4 h-4 bg-emerald-500 rounded-full ring-4 ring-zinc-900" />
+
+                            {/* Small Camera Icon Badge Button on the Profile Picture Section */}
+                            <button
+                              type="button"
+                              onClick={triggerAvatarUpload}
+                              title="Add or update profile picture"
+                              className="absolute -bottom-2 -right-2 p-2.5 rounded-2xl bg-brand-primary text-white shadow-xl border-2 border-zinc-950 hover:bg-brand-primary/90 hover:scale-110 active:scale-95 transition-all cursor-pointer flex items-center justify-center group/cam"
+                            >
+                              <Camera className="w-4 h-4 group-hover/cam:rotate-12 transition-transform" />
+                            </button>
                           </div>
 
-                          <div>
-                            <h4 className={`font-extrabold text-base tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>
-                              {profileName || currentUser.name}
-                            </h4>
-                            <p className="text-xs text-brand-primary font-bold uppercase tracking-wider mt-0.5">{currentUser.role}</p>
-                            <p className={`text-xs mt-1 font-medium ${theme === "light" ? "text-slate-500" : "text-zinc-400"}`}>{currentUser.email}</p>
-                          </div>
-
-                          <div className="w-full pt-4 border-t border-inherit space-y-2 text-left">
-                            <div className="flex justify-between items-center text-[11px]">
-                              <span className={theme === "light" ? "text-slate-500" : "text-zinc-400"}>Account ID:</span>
-                              <span className="font-mono text-[10px] font-bold">{currentUser.id}</span>
+                          {/* Profile Quick Info */}
+                          <div className="space-y-2 flex-grow">
+                            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                              <h2 className={`text-2xl font-black tracking-tight ${theme === "light" ? "text-slate-900" : "text-white"}`}>
+                                {profileName || currentUser.name}
+                              </h2>
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                                <CheckCircle2 className="w-3 h-3" /> Verified Staff
+                              </span>
                             </div>
-                            <div className="flex justify-between items-center text-[11px]">
-                              <span className={theme === "light" ? "text-slate-500" : "text-zinc-400"}>Console Access:</span>
-                              <span className="text-emerald-500 font-bold uppercase text-[10px]">Active</span>
+
+                            <p className="text-xs font-semibold text-zinc-400 flex items-center justify-center sm:justify-start gap-2">
+                              <Mail className="w-3.5 h-3.5 text-brand-primary" /> {currentUser.email}
+                            </p>
+
+                            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1 text-[11px]">
+                              <span className="px-2.5 py-0.5 rounded-md bg-brand-primary/10 text-brand-primary border border-brand-primary/20 text-[10px] font-bold uppercase tracking-wider">
+                                {currentUser.role} Account
+                              </span>
+                              <span className="text-zinc-500">•</span>
+                              <span className="text-zinc-400 font-mono text-[10px]">ID: {currentUser.id}</span>
+                            </div>
+
+                            <div className="pt-2 flex flex-wrap items-center justify-center sm:justify-start gap-3">
+                              <button
+                                type="button"
+                                onClick={triggerAvatarUpload}
+                                className="px-4 py-2 rounded-xl bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary border border-brand-primary/20 text-xs font-bold transition-all flex items-center gap-2 cursor-pointer"
+                              >
+                                <Camera className="w-3.5 h-3.5" />
+                                Add / Update Picture
+                              </button>
+
+                              {profileAvatar && (
+                                <button
+                                  type="button"
+                                  onClick={() => setProfileAvatar("")}
+                                  className="px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  Remove Photo
+                                </button>
+                              )}
                             </div>
                           </div>
                         </div>
+                      </div>
 
-                        {/* Edit Profile Form */}
-                        <div className={`md:col-span-2 p-6 border rounded-2xl ${
-                          theme === "light" ? "bg-white border-slate-200/80 shadow-sm" : "bg-zinc-900/60 border-zinc-800"
-                        }`}>
-                          <form onSubmit={handleSaveProfile} className="space-y-5">
-                            <h4 className="font-bold text-xs tracking-wide uppercase text-brand-primary border-b border-inherit pb-3 flex items-center gap-2">
-                              <Settings className="w-4 h-4" />
-                              Update Profile Picture & Information
-                            </h4>
+                      {profileSuccess && (
+                        <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-xs font-bold flex items-center justify-between shadow-xs">
+                          <div className="flex items-center gap-2.5">
+                            <CheckCircle2 className="w-4 h-4 shrink-0" />
+                            <span>{profileSuccess}</span>
+                          </div>
+                          <button onClick={() => setProfileSuccess("")} className="text-emerald-500 hover:text-emerald-400 p-1">
+                            <X className="w-4 h-4" />
+                          </button>
+                        </motion.div>
+                      )}
 
-                            <ImageUploadField
-                              label="Profile Picture Avatar URL"
-                              value={profileAvatar}
-                              onChange={setProfileAvatar}
-                              placeholder="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e"
-                              theme={theme}
-                            />
+                      {/* Profile Details Form Card */}
+                      <div className={`p-6 sm:p-8 border rounded-3xl ${
+                        theme === "light" ? "bg-white border-slate-200/80 shadow-sm" : "bg-zinc-900/60 border-zinc-800"
+                      }`}>
+                        <form onSubmit={handleSaveProfile} className="space-y-6">
+                          <h4 className="font-bold text-xs tracking-wider uppercase text-brand-primary border-b border-inherit pb-3 flex items-center justify-between">
+                            <span className="flex items-center gap-2">
+                              <User className="w-4 h-4" /> Personal & Account Information
+                            </span>
+                            <span className="text-[10px] text-zinc-500 font-normal">Staff Profile</span>
+                          </h4>
 
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                             <div>
                               <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
-                                Full Name
+                                Full Name <span className="text-rose-500">*</span>
                               </label>
                               <input
                                 type="text"
+                                required
                                 value={profileName}
                                 onChange={e => setProfileName(e.target.value)}
-                                className={`w-full px-4 py-2.5 border rounded-xl text-xs font-semibold focus:border-brand-primary focus:outline-none ${
+                                placeholder="Your full display name"
+                                className={`w-full px-4 py-2.5 border rounded-xl text-xs font-semibold focus:border-brand-primary focus:outline-none transition-colors ${
                                   theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
                                 }`}
                               />
@@ -3696,51 +3858,108 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
 
                             <div>
                               <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
-                                Email Address <span className="text-zinc-500 font-normal">(Read-only)</span>
+                                Email Address <span className="text-zinc-500 font-normal">(Verified Lock)</span>
                               </label>
-                              <input
-                                type="email"
-                                value={currentUser.email}
-                                disabled
-                                className={`w-full px-4 py-2.5 border rounded-xl text-xs font-semibold opacity-60 cursor-not-allowed ${
-                                  theme === "light" ? "bg-slate-100 border-slate-200 text-slate-700" : "bg-zinc-900 border-zinc-800 text-zinc-400"
-                                }`}
-                              />
+                              <div className="relative">
+                                <input
+                                  type="email"
+                                  value={currentUser.email}
+                                  disabled
+                                  className={`w-full px-4 py-2.5 border rounded-xl text-xs font-semibold opacity-60 cursor-not-allowed pr-10 ${
+                                    theme === "light" ? "bg-slate-100 border-slate-200 text-slate-700" : "bg-zinc-900 border-zinc-800 text-zinc-400"
+                                  }`}
+                                />
+                                <Lock className="w-3.5 h-3.5 text-zinc-500 absolute right-3.5 top-3" />
+                              </div>
                             </div>
+                          </div>
 
-                            <div>
-                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
-                                Bio / Author Tagline <span className="text-zinc-500 font-normal">(Optional)</span>
+                          <div>
+                            <div className="flex justify-between items-center mb-1">
+                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">
+                                Author Bio / Corporate Tagline
                               </label>
-                              <textarea
-                                rows={3}
-                                placeholder="e.g. Executive Leader driving AI transformation and enterprise cloud innovation..."
-                                value={profileBio}
-                                onChange={e => setProfileBio(e.target.value)}
-                                className={`w-full px-4 py-2.5 border rounded-xl text-xs font-semibold focus:border-brand-primary focus:outline-none ${
-                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
-                                }`}
-                              />
+                              <span className="text-[10px] text-zinc-500 font-semibold">{profileBio.length} / 300 chars</span>
                             </div>
+                            <textarea
+                              rows={3}
+                              maxLength={300}
+                              placeholder="e.g. Executive Leader driving digital transformation and enterprise technology innovation..."
+                              value={profileBio}
+                              onChange={e => setProfileBio(e.target.value)}
+                              className={`w-full px-4 py-2.5 border rounded-xl text-xs font-semibold focus:border-brand-primary focus:outline-none leading-relaxed ${
+                                theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                              }`}
+                            />
+                            <p className="text-[11px] text-zinc-500 mt-1 font-medium">
+                              This bio displays on corporate blog posts and staff author cards.
+                            </p>
+                          </div>
 
-                            <div className="pt-2">
-                              <button
-                                type="submit"
-                                disabled={profileLoading}
-                                className="px-6 py-3 bg-brand-primary hover:bg-brand-primary/90 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all cursor-pointer flex items-center gap-2"
-                              >
-                                {profileLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                                Save Profile Changes
-                              </button>
+                          {/* Active Privileges Overview */}
+                          <div className="pt-2 border-t border-inherit space-y-3">
+                            <h4 className="font-bold text-xs tracking-wider uppercase text-brand-primary flex items-center justify-between">
+                              <span className="flex items-center gap-2">
+                                <ShieldCheck className="w-4 h-4" /> Active Console Privileges
+                              </span>
+                              <span className="text-[10px] text-emerald-500 font-bold uppercase">Role: {currentUser.role}</span>
+                            </h4>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                              {[
+                                { id: "overview", label: "Dashboard Analytics" },
+                                { id: "bookings", label: "Client Consultations" },
+                                { id: "messages", label: "Contact Enquiries" },
+                                { id: "insights_cms", label: "Insights / Blog CMS" },
+                                { id: "portfolio_cms", label: "Portfolio Showcase" },
+                                { id: "services_cms", label: "Services & Pricing" },
+                                { id: "training_cms", label: "Academy Courses" },
+                                { id: "about_cms", label: "About Page Content" },
+                                { id: "staff", label: "Staff Management" }
+                              ].map((mod) => {
+                                const isPermitted = isTabPermitted(mod.id, currentUser.role, currentUser.allowedTabs);
+                                return (
+                                  <div 
+                                    key={mod.id} 
+                                    className={`p-2.5 rounded-xl border text-[11px] font-bold flex items-center justify-between ${
+                                      isPermitted 
+                                        ? theme === "light" ? "bg-emerald-50 border-emerald-200 text-emerald-900" : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" 
+                                        : theme === "light" ? "bg-slate-50 border-slate-200 text-slate-400 opacity-60" : "bg-zinc-950 border-zinc-800 text-zinc-600 opacity-60"
+                                    }`}
+                                  >
+                                    <span className="truncate">{mod.label}</span>
+                                    {isPermitted ? (
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                                    ) : (
+                                      <Lock className="w-3.5 h-3.5 text-zinc-600 shrink-0" />
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
-                          </form>
-                        </div>
+                          </div>
+
+                          {/* Save Button */}
+                          <div className="pt-3 flex items-center justify-between gap-4 border-t border-inherit">
+                            <button
+                              type="submit"
+                              disabled={profileLoading}
+                              className="w-full sm:w-auto px-8 py-3.5 bg-brand-primary hover:bg-brand-primary/90 text-white font-bold text-xs uppercase tracking-wider rounded-2xl shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2.5"
+                            >
+                              {profileLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                              Save Profile Changes
+                            </button>
+                            
+                            <p className="text-[11px] text-zinc-500 hidden sm:block font-medium">
+                              Changes sync immediately across corporate blogs & team profile widgets.
+                            </p>
+                          </div>
+                        </form>
                       </div>
                     </motion.div>
                   )}
-
                   {/* --- TAB: INSIGHTS CMS --- */}
-                  {!dataLoading && activeTab === "insights_cms" && (
+                  {activeTab === "insights_cms" && (
                     <div className="space-y-6 animate-fade-in">
                       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-inherit">
                         <div>
@@ -3811,7 +4030,7 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                   )}
 
                   {/* --- TAB: CAREERS CMS --- */}
-                  {!dataLoading && activeTab === "careers_cms" && (
+                  {activeTab === "careers_cms" && (
                     <div className="space-y-6 animate-fade-in">
                       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-inherit">
                         <div>
@@ -3881,7 +4100,7 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                   )}
 
                   {/* --- TAB: TRAINING CMS --- */}
-                  {!dataLoading && activeTab === "training_cms" && (
+                  {activeTab === "training_cms" && (
                     <div className="space-y-6 animate-fade-in">
                       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-inherit">
                         <div>
@@ -3956,7 +4175,7 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                   )}
 
                   {/* --- TAB: ABOUT PAGE & TEAM CMS --- */}
-                  {!dataLoading && activeTab === "about_cms" && (
+                  {activeTab === "about_cms" && (
                     <div className="space-y-8 animate-fade-in">
                       {/* Top text updates */}
                       <div className={`p-6 border rounded-3xl space-y-4 ${theme === "light" ? "bg-white border-slate-200" : "bg-zinc-900/30 border-zinc-850"}`}>
@@ -4168,7 +4387,7 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                   )}
 
                   {/* --- TAB: PORTFOLIO CMS --- */}
-                  {!dataLoading && activeTab === "portfolio_cms" && (
+                  {activeTab === "portfolio_cms" && (
                     <div className="space-y-6 animate-fade-in">
                       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-inherit">
                         <div>
@@ -4250,7 +4469,7 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                   )}
 
                   {/* --- TAB: SERVICES CMS --- */}
-                  {!dataLoading && activeTab === "services_cms" && (
+                  {activeTab === "services_cms" && (
                     <div className="space-y-6 animate-fade-in">
                       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-inherit">
                         <div>

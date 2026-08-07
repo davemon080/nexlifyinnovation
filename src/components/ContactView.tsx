@@ -14,10 +14,19 @@ import {
   Check, 
   Copy,
   ChevronDown,
-  ArrowRight
+  ArrowRight,
+  Instagram,
+  Twitter,
+  ExternalLink
 } from "lucide-react";
 import { saveContactMessage } from "../lib/db";
 import { FAQs } from "../data";
+
+const TikTokIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 1 1-5.2-1.74 2.89 2.89 0 0 1 2.31-2.22V8.2a6.34 6.34 0 0 0-3.32.92 6.34 6.34 0 0 0-2.8 5.23 6.34 6.34 0 0 0 6.33 6.33c3.5 0 6.33-2.83 6.33-6.33V9a8.16 8.16 0 0 0 4.78 1.53V7.08a4.85 4.85 0 0 1-1.21-.39z"/>
+  </svg>
+);
 
 export default function ContactView() {
   const [formData, setFormData] = useState({
@@ -196,6 +205,79 @@ export default function ContactView() {
                   <h4 className="text-white font-extrabold text-xs uppercase tracking-wider">Nexlify Headquarters</h4>
                   <p className="text-zinc-400 text-xs mt-1 leading-relaxed font-bold">Nassarawa State, Nigeria</p>
                   <span className="text-[10px] text-zinc-600 block mt-1 uppercase tracking-wider font-semibold">Open Hours: 9:00 AM - 5:00 PM (GMT+1)</span>
+                </div>
+              </div>
+
+              {/* Official Social Media Channels Card */}
+              <div className="p-4 bg-zinc-950/80 border border-zinc-900 rounded-none space-y-3">
+                <div className="flex items-center justify-between border-b border-zinc-900 pb-2">
+                  <h4 className="text-white font-extrabold text-xs uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-brand-primary" /> Official Social Channels
+                  </h4>
+                  <span className="text-[9px] font-bold uppercase tracking-wider bg-brand-primary/10 text-brand-primary px-2 py-0.5 border border-brand-primary/20">
+                    Verified Accounts
+                  </span>
+                </div>
+                <p className="text-zinc-500 text-[11px] leading-relaxed">
+                  Follow Nexlify Innovation across our 3 official social media channels for real-time announcements and showcase drops:
+                </p>
+                <div className="space-y-2 pt-1">
+                  {/* TikTok */}
+                  <a
+                    href="https://www.tiktok.com/@nexlifyinnovation?is_from_webapp=1&sender_device=pc"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2.5 bg-zinc-900/90 border border-zinc-800 hover:border-pink-500/40 hover:bg-zinc-850 text-zinc-300 hover:text-white transition-all flex items-center justify-between group"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-1.5 rounded bg-pink-500/10 text-pink-400 group-hover:scale-110 transition-transform">
+                        <TikTokIcon className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold block text-white">TikTok</span>
+                        <span className="text-[10px] text-zinc-500 font-medium">@nexlifyinnovation</span>
+                      </div>
+                    </div>
+                    <ExternalLink className="w-3.5 h-3.5 text-zinc-500 group-hover:text-pink-400 transition-colors" />
+                  </a>
+
+                  {/* Instagram */}
+                  <a
+                    href="https://www.instagram.com/nexlify_innovation?igsh=dXVreWgzaDUzcnhy&utm_source=qr"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2.5 bg-zinc-900/90 border border-zinc-800 hover:border-amber-500/40 hover:bg-zinc-850 text-zinc-300 hover:text-white transition-all flex items-center justify-between group"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-1.5 rounded bg-amber-500/10 text-amber-400 group-hover:scale-110 transition-transform">
+                        <Instagram className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold block text-white">Instagram</span>
+                        <span className="text-[10px] text-zinc-500 font-medium">@nexlify_innovation</span>
+                      </div>
+                    </div>
+                    <ExternalLink className="w-3.5 h-3.5 text-zinc-500 group-hover:text-amber-400 transition-colors" />
+                  </a>
+
+                  {/* Twitter / X */}
+                  <a
+                    href="https://twitter.com/NexlifyInn55"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2.5 bg-zinc-900/90 border border-zinc-800 hover:border-sky-500/40 hover:bg-zinc-850 text-zinc-300 hover:text-white transition-all flex items-center justify-between group"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-1.5 rounded bg-sky-500/10 text-sky-400 group-hover:scale-110 transition-transform">
+                        <Twitter className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <span className="text-xs font-bold block text-white">Twitter / X</span>
+                        <span className="text-[10px] text-zinc-500 font-medium">@NexlifyInn55</span>
+                      </div>
+                    </div>
+                    <ExternalLink className="w-3.5 h-3.5 text-zinc-500 group-hover:text-sky-400 transition-colors" />
+                  </a>
                 </div>
               </div>
 

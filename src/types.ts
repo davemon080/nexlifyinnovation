@@ -65,6 +65,7 @@ export interface TeamMember {
     twitter?: string;
     linkedin?: string;
     instagram?: string;
+    tiktok?: string;
     github?: string;
   };
 }

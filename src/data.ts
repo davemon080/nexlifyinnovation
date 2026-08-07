@@ -217,42 +217,42 @@ export const TEAM: TeamMember[] = [
     role: "Founder & Lead Creative",
     image: "https://iili.io/Bp1FLPV.jpg",
     bio: "Visionary designer and lead developer driving technological innovation and digital literacy across Nigeria.",
-    socials: { twitter: "#", linkedin: "#", instagram: "https://instagram.com/nexlify_innovation" }
+    socials: { twitter: "https://twitter.com/NexlifyInn55", instagram: "https://www.instagram.com/nexlify_innovation?igsh=dXVreWgzaDUzcnhy&utm_source=qr", tiktok: "https://www.tiktok.com/@nexlifyinnovation?is_from_webapp=1&sender_device=pc" }
   },
   {
     name: "Israel Ujah",
     role: "Manager",
     image: "https://iili.io/Bp1YSuj.png",
     bio: "Strategic director ensuring pristine operations, high-fidelity project delivery, and academy student excellence.",
-    socials: { linkedin: "#" }
+    socials: { twitter: "https://twitter.com/NexlifyInn55", instagram: "https://www.instagram.com/nexlify_innovation?igsh=dXVreWgzaDUzcnhy&utm_source=qr" }
   },
   {
     name: "Favor",
     role: "Lead Graphic Designer",
     image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=80",
     bio: "Visual storyteller shaping highly memorable branding and user identities for multi-national digital brands.",
-    socials: { instagram: "#" }
+    socials: { instagram: "https://www.instagram.com/nexlify_innovation?igsh=dXVreWgzaDUzcnhy&utm_source=qr", tiktok: "https://www.tiktok.com/@nexlifyinnovation?is_from_webapp=1&sender_device=pc" }
   },
   {
     name: "Divine Favor",
     role: "Content Lead",
     image: "https://iili.io/Bp1z2a4.jpg",
     bio: "Copywriter specializing in strategic narratives and high-conversion marketing assets for tech scaleups.",
-    socials: { twitter: "#", linkedin: "#" }
+    socials: { twitter: "https://twitter.com/NexlifyInn55", tiktok: "https://www.tiktok.com/@nexlifyinnovation?is_from_webapp=1&sender_device=pc" }
   },
   {
     name: "Abutu Joseph",
     role: "Content Specialist",
     image: "https://iili.io/BpMaPnf.jpg",
     bio: "Engaging editor and developer relations specialist translating technical concepts into viral digital content.",
-    socials: { linkedin: "#", twitter: "#" }
+    socials: { twitter: "https://twitter.com/NexlifyInn55", instagram: "https://www.instagram.com/nexlify_innovation?igsh=dXVreWgzaDUzcnhy&utm_source=qr" }
   },
   {
     name: "Anigboro Joseph",
     role: "Content Writer",
     image: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&w=400&q=80",
     bio: "Researcher dedicated to delivering highly engaging corporate blog posts and clear technical writing.",
-    socials: { linkedin: "#" }
+    socials: { twitter: "https://twitter.com/NexlifyInn55" }
   }
 ];
 

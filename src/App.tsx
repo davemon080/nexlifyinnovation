@@ -37,6 +37,13 @@ import BookConsultationView from "./components/BookConsultationView";
 import ServiceDetailModal from "./components/ServiceDetailModal";
 import AdminDashboardView from "./components/AdminDashboardView";
 
+// Custom TikTok Icon
+const TikTokIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 1 1-5.2-1.74 2.89 2.89 0 0 1 2.31-2.22V8.2a6.34 6.34 0 0 0-3.32.92 6.34 6.34 0 0 0-2.8 5.23 6.34 6.34 0 0 0 6.33 6.33c3.5 0 6.33-2.83 6.33-6.33V9a8.16 8.16 0 0 0 4.78 1.53V7.08a4.85 4.85 0 0 1-1.21-.39z"/>
+  </svg>
+);
+
 const SEO = ({ title, description }: { title?: string, description?: string }) => {
   const siteTitle = title ? `${title} | Nexlify Innovation` : "Nexlify Innovation | Premium Enterprise Software & Training Agency";
   const siteDesc = description || "Nexlify Innovation is Nigeria's premier creative software engineering agency specializing in high-performance Web Development, Custom Apps, Brand Design, and Academy Training.";
@@ -54,6 +61,8 @@ const SEO = ({ title, description }: { title?: string, description?: string }) =
       <meta name="twitter:title" content={siteTitle} />
       <meta name="twitter:description" content={siteDesc} />
       <meta name="twitter:image" content={siteLogo} />
+      <meta name="twitter:site" content="@NexlifyInn55" />
+      <meta name="twitter:creator" content="@NexlifyInn55" />
     </Helmet>
   );
 };
@@ -536,24 +545,28 @@ export default function App() {
               We translate critical software requirements and visual standards into fully responsive systems. Partner with Nigeria's premium creative innovation studio.
             </p>
 
-            {/* Social channels */}
-            <div className="flex gap-4">
-              {[
-                { icon: Facebook, href: "https://facebook.com/nexlifyinnovation" },
-                { icon: Instagram, href: "https://instagram.com/nexlify_innovation" },
-                { icon: Twitter, href: "https://twitter.com/nexlify" },
-                { icon: Linkedin, href: "https://linkedin.com/company/nexlify" }
-              ].map((soc, idx) => (
-                <a 
-                  key={idx} 
-                  href={soc.href} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="p-2 rounded-lg bg-zinc-900 border border-zinc-850 hover:border-brand-primary/45 hover:text-white text-zinc-400 transition-colors"
-                >
-                  <soc.icon className="w-4 h-4" />
-                </a>
-              ))}
+            {/* Official Social channels */}
+            <div className="space-y-2">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Official Social Channels</span>
+              <div className="flex flex-wrap gap-2.5">
+                {[
+                  { name: "TikTok", handle: "@nexlifyinnovation", icon: TikTokIcon, href: "https://www.tiktok.com/@nexlifyinnovation?is_from_webapp=1&sender_device=pc", color: "hover:text-pink-400 hover:border-pink-500/40" },
+                  { name: "Instagram", handle: "@nexlify_innovation", icon: Instagram, href: "https://www.instagram.com/nexlify_innovation?igsh=dXVreWgzaDUzcnhy&utm_source=qr", color: "hover:text-amber-400 hover:border-amber-500/40" },
+                  { name: "Twitter / X", handle: "@NexlifyInn55", icon: Twitter, href: "https://twitter.com/NexlifyInn55", color: "hover:text-sky-400 hover:border-sky-500/40" }
+                ].map((soc, idx) => (
+                  <a 
+                    key={idx} 
+                    href={soc.href} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    title={`${soc.name} (${soc.handle})`}
+                    className={`px-3 py-2 rounded-xl bg-zinc-900/90 border border-zinc-800 hover:bg-zinc-850 text-zinc-400 transition-all flex items-center gap-2 text-xs font-bold ${soc.color}`}
+                  >
+                    <soc.icon className="w-4 h-4 shrink-0" />
+                    <span>{soc.name}</span>
+                  </a>
+                ))}
+              </div>
             </div>
           </div>
 

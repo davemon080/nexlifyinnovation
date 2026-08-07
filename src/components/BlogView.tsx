@@ -738,7 +738,7 @@ export default function BlogView() {
                   <div className="grid grid-cols-2 gap-2">
                     {/* Twitter */}
                     <a
-                      href={`https://twitter.com/intent/tweet?text=Check out this brilliant insight by @nexlify: ${encodeURIComponent(selectedPost.title)}&url=${encodeURIComponent(window.location.href)}`}
+                      href={`https://twitter.com/intent/tweet?text=Check out this brilliant insight by @NexlifyInn55: ${encodeURIComponent(selectedPost.title)}&url=${encodeURIComponent(window.location.href)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center justify-center gap-2 p-2.5 bg-zinc-900 border border-zinc-850 text-zinc-400 hover:text-white hover:border-brand-primary transition-colors text-xs font-bold rounded-none"

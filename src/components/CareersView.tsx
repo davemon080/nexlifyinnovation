@@ -600,7 +600,7 @@ export default function CareersView() {
 
                   <div className="grid grid-cols-2 gap-2">
                     <a
-                      href={`https://twitter.com/intent/tweet?text=We're hiring a ${encodeURIComponent(selectedJob.title)} at @nexlify! Check it out: &url=${encodeURIComponent(window.location.href)}`}
+                      href={`https://twitter.com/intent/tweet?text=We're hiring a ${encodeURIComponent(selectedJob.title)} at @NexlifyInn55! Check it out: &url=${encodeURIComponent(window.location.href)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center justify-center gap-2 p-2.5 bg-zinc-900 border border-zinc-850 text-zinc-400 hover:text-white hover:border-brand-primary transition-colors text-xs font-bold rounded-none"

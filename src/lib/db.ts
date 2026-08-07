@@ -366,6 +366,66 @@ const setLocalCollection = <T>(key: string, data: T[]): void => {
   localStorage.setItem(key, JSON.stringify(data));
 };
 
+// Synchronous Cache Accessors for Instant UI Rendering
+export function getCachedConsultations(): Consultation[] {
+  const local = getLocalCollection<Consultation>("nexlify_consultations");
+  return local.length > 0 ? local : INITIAL_CONSULTATIONS;
+}
+
+export function getCachedContactMessages(): ContactMessage[] {
+  const local = getLocalCollection<ContactMessage>("nexlify_contact_messages");
+  return local.length > 0 ? local : INITIAL_CONTACT_MESSAGES;
+}
+
+export function getCachedJobApplications(): JobApplication[] {
+  const local = getLocalCollection<JobApplication>("nexlify_job_applications");
+  return local.length > 0 ? local : INITIAL_JOB_APPLICATIONS;
+}
+
+export function getCachedStaffUsers(): StaffUser[] {
+  const local = getLocalCollection<StaffUser>("nexlify_staff");
+  return local.length > 0 ? local : INITIAL_STAFF;
+}
+
+export function getCachedServices(): Service[] {
+  const local = getLocalCollection<Service>("nexlify_services");
+  return local.length > 0 ? local : SERVICES;
+}
+
+export function getCachedProjects(): Project[] {
+  const local = getLocalCollection<Project>("nexlify_projects");
+  return local.length > 0 ? local : PROJECTS;
+}
+
+export function getCachedCourses(): Course[] {
+  const local = getLocalCollection<Course>("nexlify_courses");
+  return local.length > 0 ? local : COURSES;
+}
+
+export function getCachedBlogs(): BlogPost[] {
+  const local = getLocalCollection<BlogPost>("nexlify_blogs");
+  return local.length > 0 ? local : BLOGS;
+}
+
+export function getCachedJobs(): JobOpening[] {
+  const local = getLocalCollection<JobOpening>("nexlify_jobs");
+  return local.length > 0 ? local : JOBS;
+}
+
+export function getCachedAboutPageData(): AboutPageData {
+  try {
+    const raw = localStorage.getItem("nexlify_about_page");
+    return raw ? JSON.parse(raw) : DEFAULT_ABOUT_PAGE;
+  } catch {
+    return DEFAULT_ABOUT_PAGE;
+  }
+}
+
+export function getCachedTeamMembers(): TeamMember[] {
+  const local = getLocalCollection<TeamMember>("nexlify_team");
+  return local.length > 0 ? local : TEAM;
+}
+
 // ==================== SYSTEM DATABASE OPERATIONS ====================
 
 // 1. DATABASE CONNECTIVITY HEALTH STATUS
@@ -417,6 +477,7 @@ export async function getConsultations(): Promise<Consultation[]> {
           createdAt: d.createdAt instanceof Timestamp ? d.createdAt.toDate().toISOString() : d.createdAt
         } as Consultation);
       });
+      if (items.length > 0) setLocalCollection("nexlify_consultations", items);
       return items;
     } catch (e) {
       console.error("Firebase fetch error, loading from local fallback:", e);
@@ -512,6 +573,7 @@ export async function getContactMessages(): Promise<ContactMessage[]> {
           createdAt: d.createdAt instanceof Timestamp ? d.createdAt.toDate().toISOString() : d.createdAt
         } as ContactMessage);
       });
+      if (items.length > 0) setLocalCollection("nexlify_contact_messages", items);
       return items;
     } catch (e) {
       console.error("Firebase message fetch error, loading from local fallback:", e);
@@ -607,6 +669,7 @@ export async function getJobApplications(): Promise<JobApplication[]> {
           createdAt: d.createdAt instanceof Timestamp ? d.createdAt.toDate().toISOString() : d.createdAt
         } as JobApplication);
       });
+      if (items.length > 0) setLocalCollection("nexlify_job_applications", items);
       return items;
     } catch (e) {
       console.error("Firebase applications fetch error, loading from local fallback:", e);
@@ -744,6 +807,7 @@ export async function getStaffUsers(): Promise<StaffUser[]> {
           id: doc.id
         } as StaffUser);
       });
+      if (items.length > 0) setLocalCollection("nexlify_staff", items);
       return items;
     } catch (e) {
       console.error("Firebase staff fetch error, loading from local fallback:", e);
@@ -756,62 +820,80 @@ export async function getStaffUsers(): Promise<StaffUser[]> {
 
 export async function updateStaffRole(email: string, role: StaffUser["role"]): Promise<boolean> {
   const staff = getLocalCollection<StaffUser>("nexlify_staff");
-  const idx = staff.findIndex(s => s.email.toLowerCase() === email.toLowerCase());
+  const emailLower = email.trim().toLowerCase();
+  let idx = staff.findIndex(s => s.email.toLowerCase() === emailLower);
   if (idx !== -1) {
     staff[idx].role = role;
-    setLocalCollection("nexlify_staff", staff);
-
-    if (isFirebaseEnabled && db) {
-      try {
-        // Find by email in firestore
-        const querySnapshot = await getDocs(collection(db, "staff_users"));
-        let firestoreId = null;
-        querySnapshot.forEach((doc) => {
-          if (doc.data().email.toLowerCase() === email.toLowerCase()) {
-            firestoreId = doc.id;
-          }
-        });
-        if (firestoreId) {
-          await updateDoc(doc(db, "staff_users", firestoreId), { role });
-        }
-      } catch (e) {
-        console.error("Firebase staff role update error:", e);
-        handleFirestoreError(e, OperationType.UPDATE, "staff_users");
-      }
-    }
-    return true;
+  } else {
+    const newUser: StaffUser = {
+      id: emailLower === "employee@nexlify.com" ? "staff-2" : `staff-${Date.now()}`,
+      name: emailLower === "employee@nexlify.com" ? "Israel Ujah" : emailLower === "ceo@nexlify.com" ? "David Simon" : emailLower.split("@")[0],
+      email: emailLower,
+      role: role,
+      createdAt: new Date().toISOString()
+    };
+    staff.push(newUser);
   }
-  return false;
+  setLocalCollection("nexlify_staff", staff);
+
+  if (isFirebaseEnabled && db) {
+    try {
+      // Find by email in firestore
+      const querySnapshot = await getDocs(collection(db, "staff_users"));
+      let firestoreId = null;
+      querySnapshot.forEach((doc) => {
+        if (doc.data().email?.toLowerCase() === emailLower) {
+          firestoreId = doc.id;
+        }
+      });
+      if (firestoreId) {
+        await updateDoc(doc(db, "staff_users", firestoreId), { role });
+      }
+    } catch (e) {
+      console.error("Firebase staff role update error:", e);
+      handleFirestoreError(e, OperationType.UPDATE, "staff_users");
+    }
+  }
+  return true;
 }
 
 export async function updateStaffPermissions(email: string, allowedTabs: string[]): Promise<boolean> {
   const staff = getLocalCollection<StaffUser>("nexlify_staff");
   const emailLower = email.trim().toLowerCase();
-  const idx = staff.findIndex(s => s.email.toLowerCase() === emailLower);
+  let idx = staff.findIndex(s => s.email.toLowerCase() === emailLower);
   if (idx !== -1) {
     staff[idx].allowedTabs = allowedTabs;
-    setLocalCollection("nexlify_staff", staff);
-
-    if (isFirebaseEnabled && db) {
-      try {
-        const querySnapshot = await getDocs(collection(db, "staff_users"));
-        let firestoreId = null;
-        querySnapshot.forEach((doc) => {
-          if (doc.data().email?.toLowerCase() === emailLower) {
-            firestoreId = doc.id;
-          }
-        });
-        if (firestoreId) {
-          await updateDoc(doc(db, "staff_users", firestoreId), { allowedTabs });
-        }
-      } catch (e) {
-        console.error("Firebase staff permissions update error:", e);
-        handleFirestoreError(e, OperationType.UPDATE, "staff_users");
-      }
-    }
-    return true;
+  } else {
+    const newUser: StaffUser = {
+      id: emailLower === "employee@nexlify.com" ? "staff-2" : `staff-${Date.now()}`,
+      name: emailLower === "employee@nexlify.com" ? "Israel Ujah" : emailLower === "ceo@nexlify.com" ? "David Simon" : emailLower.split("@")[0],
+      email: emailLower,
+      role: emailLower === "ceo@nexlify.com" ? "CEO" : "Employee",
+      allowedTabs: allowedTabs,
+      createdAt: new Date().toISOString()
+    };
+    staff.push(newUser);
   }
-  return false;
+  setLocalCollection("nexlify_staff", staff);
+
+  if (isFirebaseEnabled && db) {
+    try {
+      const querySnapshot = await getDocs(collection(db, "staff_users"));
+      let firestoreId = null;
+      querySnapshot.forEach((doc) => {
+        if (doc.data().email?.toLowerCase() === emailLower) {
+          firestoreId = doc.id;
+        }
+      });
+      if (firestoreId) {
+        await updateDoc(doc(db, "staff_users", firestoreId), { allowedTabs });
+      }
+    } catch (e) {
+      console.error("Firebase staff permissions update error:", e);
+      handleFirestoreError(e, OperationType.UPDATE, "staff_users");
+    }
+  }
+  return true;
 }
 
 export async function updateStaffProfile(email: string, updates: { avatar?: string; name?: string; bio?: string }): Promise<StaffUser | null> {
@@ -907,16 +989,16 @@ export async function registerStaffUser(email: string, password: string, name: s
 export async function loginStaffUser(email: string, password: string): Promise<StaffUser | string> {
   const emailLower = email.trim().toLowerCase();
   
+  const staff = getLocalCollection<StaffUser>("nexlify_staff");
+  const localUser = staff.find(s => s.email.toLowerCase() === emailLower);
+
   // Check preset accounts first
   if (emailLower === "ceo@nexlify.com" && password === "ceopassword123") {
-    return { id: "staff-1", name: "David Simon", email: "ceo@nexlify.com", role: "CEO", createdAt: new Date().toISOString() };
+    return localUser || { id: "staff-1", name: "David Simon", email: "ceo@nexlify.com", role: "CEO", createdAt: new Date().toISOString() };
   }
   if (emailLower === "employee@nexlify.com" && password === "employeepassword123") {
-    return { id: "staff-2", name: "Israel Ujah", email: "employee@nexlify.com", role: "Employee", createdAt: new Date().toISOString() };
+    return localUser || { id: "staff-2", name: "Israel Ujah", email: "employee@nexlify.com", role: "Employee", createdAt: new Date().toISOString() };
   }
-
-  // Check locally registered staff
-  const staff = getLocalCollection<StaffUser>("nexlify_staff");
   const user = staff.find(s => s.email.toLowerCase() === emailLower);
   if (!user) {
     return "Invalid staff email address or unlisted administrator.";

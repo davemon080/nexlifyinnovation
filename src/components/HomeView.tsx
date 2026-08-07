@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "motion/react";
-import { ArrowRight, Code, Palette, Smartphone, Sparkles, CheckCircle2, Shield, Zap, Globe, MessageSquare } from "lucide-react";
+import { ArrowRight, Code, Palette, Smartphone, Sparkles, CheckCircle2, Shield, Zap, Globe, MessageSquare, Monitor, Calendar, Clock } from "lucide-react";
 import { SERVICES, PROJECTS, PROCESS_STAGES, TECH_STACK, BLOGS, COURSES } from "../data";
-import { getServices } from "../lib/db";
-import { Service, ViewType } from "../types";
+import { getServices, getProjects, getBlogs } from "../lib/db";
+import { Service, Project, BlogPost, ViewType } from "../types";
 import HeroServiceShowcase from "./HeroServiceShowcase";
 
 interface HomeViewProps {
@@ -13,6 +13,8 @@ interface HomeViewProps {
 
 export default function HomeView({ setView, setSelectedService }: HomeViewProps) {
   const [servicesList, setServicesList] = useState<Service[]>(SERVICES);
+  const [projectsList, setProjectsList] = useState<Project[]>(PROJECTS);
+  const [blogsList, setBlogsList] = useState<BlogPost[]>(BLOGS);
 
   useEffect(() => {
     getServices()
@@ -22,6 +24,22 @@ export default function HomeView({ setView, setSelectedService }: HomeViewProps)
         }
       })
       .catch(err => console.error("Error loading services in HomeView:", err));
+
+    getProjects()
+      .then(list => {
+        if (list && list.length > 0) {
+          setProjectsList(list);
+        }
+      })
+      .catch(err => console.error("Error loading projects in HomeView:", err));
+
+    getBlogs()
+      .then(list => {
+        if (list && list.length > 0) {
+          setBlogsList(list);
+        }
+      })
+      .catch(err => console.error("Error loading blogs in HomeView:", err));
   }, []);
   // Map icons from string to Lucide component
   const getIcon = (name: string) => {
@@ -208,7 +226,7 @@ export default function HomeView({ setView, setSelectedService }: HomeViewProps)
         </div>
       </section>
 
-      {/* --- LATEST PROJECTS SECTION --- */}
+      {/* --- LATEST PROJECTS / SHOWCASE SECTION --- */}
       <section className="px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-12 gap-4">
@@ -218,45 +236,64 @@ export default function HomeView({ setView, setSelectedService }: HomeViewProps)
             </div>
             <button 
               onClick={() => setView("portfolio")}
-              className="text-sm font-bold text-brand-secondary hover:text-brand-secondary/80 flex items-center gap-2 group"
+              className="text-sm font-bold text-brand-secondary hover:text-brand-secondary/80 flex items-center gap-2 group cursor-pointer"
             >
               Browse portfolio
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </button>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            {PROJECTS.map((p) => (
-              <div 
-                key={p.id}
-                onClick={() => setView("portfolio")}
-                className="group glass-card rounded-[2.5rem] overflow-hidden hover:scale-[1.02] hover:border-brand-secondary/35 transition-all duration-500 cursor-pointer"
-              >
-                <div className="relative aspect-[4/3] overflow-hidden">
-                  <img 
-                    src={p.image} 
-                    alt={p.title} 
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                    referrerPolicy="no-referrer"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 to-transparent" />
-                  <div className="absolute top-4 left-4 bg-zinc-950/80 border border-white/5 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold uppercase text-zinc-300">
-                    {p.category}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {projectsList.slice(0, 3).map((p) => {
+              const isWeb = p.category === "Websites" || p.category === "Web Applications" || p.category === "Web Application";
+              return (
+                <div 
+                  key={p.id}
+                  onClick={() => setView("portfolio")}
+                  className="group glass-card rounded-[2.5rem] overflow-hidden hover:scale-[1.02] hover:border-brand-secondary/35 transition-all duration-500 cursor-pointer flex flex-col h-full"
+                >
+                  <div className="relative aspect-[4/3] overflow-hidden bg-zinc-900 shrink-0">
+                    <img 
+                      src={p.image} 
+                      alt={p.title} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent" />
+                    
+                    <span className={`absolute top-4 left-4 bg-zinc-950/90 border ${isWeb ? "border-brand-secondary/40 text-brand-secondary" : "border-pink-500/40 text-pink-400"} backdrop-blur-md px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-xs`}>
+                      {isWeb ? (
+                        <>
+                          <Monitor className="w-3 h-3" />
+                          Web Application
+                        </>
+                      ) : (
+                        <>
+                          <Palette className="w-3 h-3" />
+                          Visual Design
+                        </>
+                      )}
+                    </span>
                   </div>
-                </div>
-                <div className="p-6">
-                  <h3 className="text-lg font-bold text-white mb-2">{p.title}</h3>
-                  <p className="text-zinc-500 text-xs line-clamp-2 leading-relaxed mb-4">{p.problem}</p>
-                  <div className="flex gap-1.5 flex-wrap">
-                    {p.tech.slice(0, 3).map((t) => (
-                      <span key={t} className="text-[9px] font-semibold uppercase bg-zinc-900 px-2 py-0.5 rounded text-zinc-400">
-                        {t}
+                  <div className="p-6 flex flex-col flex-grow">
+                    <h3 className="text-lg font-bold text-white mb-2 group-hover:text-brand-secondary transition-colors line-clamp-1">{p.title}</h3>
+                    <p className="text-zinc-500 text-xs line-clamp-3 leading-relaxed mb-4 flex-grow">{p.problem}</p>
+                    <div className="mt-auto flex items-center justify-between pt-3 border-t border-zinc-900/80">
+                      <div className="flex gap-1.5 flex-wrap">
+                        {(p.tech || []).slice(0, 3).map((t) => (
+                          <span key={t} className="text-[8px] font-bold uppercase tracking-wider bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded text-zinc-400">
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                      <span className={`text-[9px] font-extrabold uppercase tracking-widest ${isWeb ? "text-brand-secondary" : "text-pink-400"}`}>
+                        {isWeb ? "Web" : "Design"}
                       </span>
-                    ))}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
@@ -413,7 +450,7 @@ export default function HomeView({ setView, setSelectedService }: HomeViewProps)
         </div>
       </section>
 
-      {/* --- LATEST INSIGHTS SECTION --- */}
+      {/* --- LATEST INSIGHTS / BLOG SECTION --- */}
       <section className="px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-12 gap-4">
@@ -423,7 +460,7 @@ export default function HomeView({ setView, setSelectedService }: HomeViewProps)
             </div>
             <button 
               onClick={() => setView("blog")}
-              className="text-sm font-bold text-brand-primary hover:text-brand-primary/80 flex items-center gap-2 group"
+              className="text-sm font-bold text-brand-primary hover:text-brand-primary/80 flex items-center gap-2 group cursor-pointer"
             >
               View all insights
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -431,23 +468,44 @@ export default function HomeView({ setView, setSelectedService }: HomeViewProps)
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {BLOGS.slice(0, 3).map((blog) => (
+            {blogsList.slice(0, 3).map((blog) => (
               <div 
                 key={blog.id}
                 onClick={() => setView("blog")}
                 className="group glass-card rounded-[2rem] overflow-hidden hover:scale-[1.02] hover:border-brand-primary/30 transition-all duration-300 cursor-pointer flex flex-col h-full"
               >
-                <div className="relative h-44 overflow-hidden shrink-0">
-                  <img src={blog.image} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 to-transparent" />
+                <div className="relative h-44 overflow-hidden shrink-0 bg-zinc-900">
+                  <img 
+                    src={blog.image} 
+                    alt={blog.title}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent" />
+                  <span className="absolute top-3 left-3 bg-zinc-950/80 border border-brand-primary/30 backdrop-blur-md px-2.5 py-1 rounded-full text-[9px] font-bold text-brand-primary uppercase tracking-wider">
+                    {blog.category}
+                  </span>
                 </div>
                 <div className="p-6 flex flex-col flex-grow">
-                  <span className="text-[10px] font-bold text-brand-primary tracking-wider uppercase mb-2 block">{blog.category}</span>
-                  <h3 className="text-base font-bold text-white line-clamp-2 mb-3 leading-snug">{blog.title}</h3>
+                  <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-semibold mb-2">
+                    <Calendar className="w-3 h-3 text-zinc-400" />
+                    <span>{blog.date}</span>
+                    {blog.readTime && (
+                      <>
+                        <span>•</span>
+                        <Clock className="w-3 h-3 text-zinc-400" />
+                        <span>{blog.readTime}</span>
+                      </>
+                    )}
+                  </div>
+                  <h3 className="text-base font-bold text-white group-hover:text-brand-primary transition-colors line-clamp-2 mb-3 leading-snug">{blog.title}</h3>
                   <p className="text-zinc-500 text-xs line-clamp-2 mb-4 leading-relaxed flex-grow">{blog.excerpt}</p>
-                  <div className="flex items-center gap-2 mt-auto">
-                    <img src={blog.author.image} className="w-6 h-6 rounded-full object-cover" />
-                    <span className="text-[10px] font-bold text-zinc-400">{blog.author.name}</span>
+                  <div className="flex items-center gap-2.5 pt-3 border-t border-zinc-900/80 mt-auto">
+                    <img src={blog.author.image} alt={blog.author.name} className="w-6 h-6 rounded-full object-cover shrink-0" referrerPolicy="no-referrer" />
+                    <div>
+                      <span className="text-[10px] font-bold text-zinc-300 block leading-none">{blog.author.name}</span>
+                      <span className="text-[8px] text-zinc-500">{blog.author.role}</span>
+                    </div>
                   </div>
                 </div>
               </div>

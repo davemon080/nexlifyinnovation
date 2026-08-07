@@ -96,7 +96,7 @@ export default function GraphicDesignViewer({ project, onBack }: GraphicDesignVi
   };
 
   const shareLinks = {
-    twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Check out "${project.title}" on Nexlify:`)}&url=${encodeURIComponent(window.location.href)}`,
+    twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Check out "${project.title}" by @NexlifyInn55:`)}&url=${encodeURIComponent(window.location.href)}`,
     linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(window.location.href)}`,
     whatsapp: `https://api.whatsapp.com/send?text=${encodeURIComponent(`Check out "${project.title}" design on Nexlify: ${window.location.href}`)}`
   };

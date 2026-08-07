@@ -1,8 +1,14 @@
 import React from "react";
 import { motion } from "motion/react";
-import { CheckCircle2, Award, Heart, Shield, Users, Target, Rocket, Sparkles } from "lucide-react";
+import { CheckCircle2, Award, Heart, Shield, Users, Target, Rocket, Sparkles, Twitter, Instagram } from "lucide-react";
 import { getAboutPageData, getTeamMembers } from "../lib/db";
 import { TeamMember, AboutPageData } from "../types";
+
+const TikTokIcon = ({ className = "w-3.5 h-3.5" }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 1 1-5.2-1.74 2.89 2.89 0 0 1 2.31-2.22V8.2a6.34 6.34 0 0 0-3.32.92 6.34 6.34 0 0 0-2.8 5.23 6.34 6.34 0 0 0 6.33 6.33c3.5 0 6.33-2.83 6.33-6.33V9a8.16 8.16 0 0 0 4.78 1.53V7.08a4.85 4.85 0 0 1-1.21-.39z"/>
+  </svg>
+);
 
 export default function AboutView() {
   const [aboutData, setAboutData] = React.useState<AboutPageData | null>(null);
@@ -183,12 +189,33 @@ export default function AboutView() {
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent opacity-60" />
               </div>
-              <div className="text-center px-2">
+              <div className="text-center px-2 space-y-2">
                 <h4 className="text-lg font-bold text-white tracking-tight">{member.name}</h4>
-                <span className="text-[10px] font-black uppercase text-brand-primary tracking-widest block mt-0.5 mb-3">{member.role}</span>
+                <span className="text-[10px] font-black uppercase text-brand-primary tracking-widest block mt-0.5 mb-2">{member.role}</span>
                 <p className="text-zinc-500 text-xs leading-relaxed line-clamp-3">
                   {member.bio}
                 </p>
+
+                {/* Social Channels */}
+                {member.socials && (
+                  <div className="flex justify-center items-center gap-2 pt-2">
+                    {member.socials.tiktok && (
+                      <a href={member.socials.tiktok} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-pink-400 hover:border-pink-500/40 transition-colors" title="TikTok (@nexlifyinnovation)">
+                        <TikTokIcon className="w-3.5 h-3.5" />
+                      </a>
+                    )}
+                    {member.socials.instagram && (
+                      <a href={member.socials.instagram} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-amber-400 hover:border-amber-500/40 transition-colors" title="Instagram (@nexlify_innovation)">
+                        <Instagram className="w-3.5 h-3.5" />
+                      </a>
+                    )}
+                    {member.socials.twitter && (
+                      <a href={member.socials.twitter} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-sky-400 hover:border-sky-500/40 transition-colors" title="Twitter / X (@NexlifyInn55)">
+                        <Twitter className="w-3.5 h-3.5" />
+                      </a>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ))}
