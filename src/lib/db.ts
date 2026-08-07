@@ -171,6 +171,8 @@ export interface StaffUser {
   avatar?: string;
   bio?: string;
   allowedTabs?: string[];
+  password?: string;
+  activeSessionToken?: string;
 }
 
 // PRE-POPULATED MOCK DATA FOR LOCAL STORAGE
@@ -794,28 +796,77 @@ export async function deleteNewsletterSubscription(id: string): Promise<boolean>
   return true;
 }
 
+export function getDefaultTabsForRoleInDb(role: StaffUser["role"] | string): string[] {
+  if (role === "CEO") {
+    return ["overview", "bookings", "messages", "careers", "insights_cms", "careers_cms", "training_cms", "about_cms", "portfolio_cms", "services_cms", "staff", "my_profile"];
+  }
+  if (role === "Manager") {
+    return ["overview", "bookings", "messages", "careers", "insights_cms", "careers_cms", "training_cms", "about_cms", "portfolio_cms", "services_cms", "my_profile"];
+  }
+  if (role === "Customer Support") {
+    return ["overview", "bookings", "messages", "insights_cms", "my_profile"];
+  }
+  if (role === "Designer" || role === "Developer") {
+    return ["overview", "portfolio_cms", "insights_cms", "my_profile"];
+  }
+  if (role === "Content Editor") {
+    return ["overview", "insights_cms", "my_profile"];
+  }
+  return ["overview", "insights_cms", "my_profile"];
+}
+
 // 6. STAFF / ROLE MANAGEMENT API
 export async function getStaffUsers(): Promise<StaffUser[]> {
+  const authMapStr = localStorage.getItem("nexlify_auth_passwords") || "{}";
+  let authMap = JSON.parse(authMapStr);
+  let authUpdated = false;
+
+  let staff: StaffUser[] = [];
+
   if (isFirebaseEnabled && db) {
     try {
       const querySnapshot = await getDocs(collection(db, "staff_users"));
-      const items: StaffUser[] = [];
       querySnapshot.forEach((doc) => {
         const d = doc.data();
-        items.push({
+        const emailLower = (d.email || "").trim().toLowerCase();
+        if (emailLower && d.password && !authMap[emailLower]) {
+          authMap[emailLower] = d.password;
+          authUpdated = true;
+        }
+        staff.push({
           ...d,
-          id: doc.id
+          id: doc.id,
+          allowedTabs: d.allowedTabs && d.allowedTabs.length > 0 ? d.allowedTabs : getDefaultTabsForRoleInDb(d.role || "Employee")
         } as StaffUser);
       });
-      if (items.length > 0) setLocalCollection("nexlify_staff", items);
-      return items;
+      if (authUpdated) {
+        localStorage.setItem("nexlify_auth_passwords", JSON.stringify(authMap));
+      }
+      if (staff.length > 0) {
+        setLocalCollection("nexlify_staff", staff);
+        return staff;
+      }
     } catch (e) {
       console.error("Firebase staff fetch error, loading from local fallback:", e);
       handleFirestoreError(e, OperationType.LIST, "staff_users");
     }
   }
 
-  return getLocalCollection<StaffUser>("nexlify_staff");
+  staff = getLocalCollection<StaffUser>("nexlify_staff");
+
+  // Make sure preset users exist if empty
+  if (staff.length === 0) {
+    staff = [
+      { id: "staff-1", name: "David Simon", email: "ceo@nexlify.com", role: "CEO", createdAt: new Date().toISOString(), allowedTabs: getDefaultTabsForRoleInDb("CEO") },
+      { id: "staff-2", name: "Israel Ujah", email: "employee@nexlify.com", role: "Employee", createdAt: new Date().toISOString(), allowedTabs: getDefaultTabsForRoleInDb("Employee") }
+    ];
+    setLocalCollection("nexlify_staff", staff);
+  }
+
+  return staff.map(s => ({
+    ...s,
+    allowedTabs: s.allowedTabs && s.allowedTabs.length > 0 ? s.allowedTabs : getDefaultTabsForRoleInDb(s.role || "Employee")
+  }));
 }
 
 export async function updateStaffRole(email: string, role: StaffUser["role"]): Promise<boolean> {
@@ -943,30 +994,159 @@ export async function updateStaffProfile(email: string, updates: { avatar?: stri
   return updatedUser;
 }
 
+export async function updateStaffPassword(email: string, newPassword: string): Promise<boolean> {
+  const emailLower = email.trim().toLowerCase();
+  
+  // Store password in localStorage
+  const authMapStr = localStorage.getItem("nexlify_auth_passwords") || "{}";
+  const authMap = JSON.parse(authMapStr);
+  authMap[emailLower] = newPassword;
+  localStorage.setItem("nexlify_auth_passwords", JSON.stringify(authMap));
+
+  // Update in local staff collection
+  const staff = getLocalCollection<StaffUser>("nexlify_staff");
+  const idx = staff.findIndex(s => s.email.toLowerCase() === emailLower);
+  if (idx !== -1) {
+    staff[idx].password = newPassword;
+    setLocalCollection("nexlify_staff", staff);
+  }
+
+  // Update in Firebase Firestore if enabled
+  if (isFirebaseEnabled && db) {
+    try {
+      const querySnapshot = await getDocs(collection(db, "staff_users"));
+      let firestoreId: string | null = null;
+      querySnapshot.forEach((doc) => {
+        if (doc.data().email?.toLowerCase() === emailLower) {
+          firestoreId = doc.id;
+        }
+      });
+      if (firestoreId) {
+        await updateDoc(doc(db, "staff_users", firestoreId), { password: newPassword });
+      }
+    } catch (e) {
+      console.error("Firebase update password error:", e);
+      handleFirestoreError(e, OperationType.UPDATE, "staff_users");
+    }
+  }
+
+  return true;
+}
+
+export async function recordActiveSession(email: string): Promise<string> {
+  const emailLower = email.trim().toLowerCase();
+  const sessionToken = `sess_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  // Store active session token in local session map
+  const activeSessionsStr = localStorage.getItem("nexlify_staff_active_sessions") || "{}";
+  const activeSessions = JSON.parse(activeSessionsStr);
+  activeSessions[emailLower] = sessionToken;
+  localStorage.setItem("nexlify_staff_active_sessions", JSON.stringify(activeSessions));
+
+  // Update in local staff collection
+  const staff = getLocalCollection<StaffUser>("nexlify_staff");
+  const idx = staff.findIndex(s => s.email.toLowerCase() === emailLower);
+  if (idx !== -1) {
+    staff[idx].activeSessionToken = sessionToken;
+    setLocalCollection("nexlify_staff", staff);
+  }
+
+  // Sync to Firebase if enabled
+  if (isFirebaseEnabled && db) {
+    try {
+      const querySnapshot = await getDocs(collection(db, "staff_users"));
+      let firestoreId: string | null = null;
+      querySnapshot.forEach((doc) => {
+        if (doc.data().email?.toLowerCase() === emailLower) {
+          firestoreId = doc.id;
+        }
+      });
+      if (firestoreId) {
+        await updateDoc(doc(db, "staff_users", firestoreId), { activeSessionToken: sessionToken });
+      }
+    } catch (e) {
+      console.error("Firebase session sync error:", e);
+    }
+  }
+
+  return sessionToken;
+}
+
+export async function verifyActiveSession(email: string, sessionToken: string): Promise<boolean> {
+  if (!email || !sessionToken) return true;
+  const emailLower = email.trim().toLowerCase();
+
+  // 1. Check Firebase first if enabled
+  if (isFirebaseEnabled && db) {
+    try {
+      const querySnapshot = await getDocs(collection(db, "staff_users"));
+      let remoteToken: string | null = null;
+      querySnapshot.forEach((doc) => {
+        if (doc.data().email?.toLowerCase() === emailLower) {
+          remoteToken = doc.data().activeSessionToken || null;
+        }
+      });
+      if (remoteToken) {
+        return remoteToken === sessionToken;
+      }
+    } catch (e) {
+      console.error("Firebase session verify error:", e);
+    }
+  }
+
+  // 2. Fallback to local session map
+  const activeSessionsStr = localStorage.getItem("nexlify_staff_active_sessions") || "{}";
+  const activeSessions = JSON.parse(activeSessionsStr);
+  const localMapToken = activeSessions[emailLower];
+  if (localMapToken) {
+    return localMapToken === sessionToken;
+  }
+
+  // 3. Fallback to staff collection
+  const staff = getLocalCollection<StaffUser>("nexlify_staff");
+  const user = staff.find(s => s.email.toLowerCase() === emailLower);
+  if (user && user.activeSessionToken) {
+    return user.activeSessionToken === sessionToken;
+  }
+
+  return true;
+}
+
 export async function registerStaffUser(email: string, password: string, name: string, role: StaffUser["role"]): Promise<StaffUser | string> {
   const emailLower = email.trim().toLowerCase();
-  const staff = getLocalCollection<StaffUser>("nexlify_staff");
+  const staff = await getStaffUsers();
   
   if (staff.some(s => s.email.toLowerCase() === emailLower)) {
     return "Staff user with this email address already exists.";
   }
+
+  const defaultTabs = getDefaultTabsForRoleInDb(role);
+  const sessionToken = `sess_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
   const newStaff: StaffUser = {
     id: `staff-${Math.random().toString(36).substr(2, 9)}`,
     name,
     email: emailLower,
     role,
+    password,
+    allowedTabs: defaultTabs,
+    activeSessionToken: sessionToken,
     createdAt: new Date().toISOString()
   };
 
   staff.push(newStaff);
   setLocalCollection("nexlify_staff", staff);
 
-  // Store password locally (securely in standard mock format for auth fallback)
+  // Store password & active session
   const authMapStr = localStorage.getItem("nexlify_auth_passwords") || "{}";
   const authMap = JSON.parse(authMapStr);
   authMap[emailLower] = password;
   localStorage.setItem("nexlify_auth_passwords", JSON.stringify(authMap));
+
+  const activeSessionsStr = localStorage.getItem("nexlify_staff_active_sessions") || "{}";
+  const activeSessions = JSON.parse(activeSessionsStr);
+  activeSessions[emailLower] = sessionToken;
+  localStorage.setItem("nexlify_staff_active_sessions", JSON.stringify(activeSessions));
 
   if (isFirebaseEnabled && db) {
     try {
@@ -975,6 +1155,9 @@ export async function registerStaffUser(email: string, password: string, name: s
         name: newStaff.name,
         email: newStaff.email,
         role: newStaff.role,
+        password: password,
+        allowedTabs: defaultTabs,
+        activeSessionToken: sessionToken,
         createdAt: Timestamp.now()
       });
     } catch (e) {
@@ -989,31 +1172,82 @@ export async function registerStaffUser(email: string, password: string, name: s
 export async function loginStaffUser(email: string, password: string): Promise<StaffUser | string> {
   const emailLower = email.trim().toLowerCase();
   
-  const staff = getLocalCollection<StaffUser>("nexlify_staff");
-  const localUser = staff.find(s => s.email.toLowerCase() === emailLower);
+  // Ensure we have the latest staff list from DB/local storage
+  const staff = await getStaffUsers();
 
-  // Check preset accounts first
-  if (emailLower === "ceo@nexlify.com" && password === "ceopassword123") {
-    return localUser || { id: "staff-1", name: "David Simon", email: "ceo@nexlify.com", role: "CEO", createdAt: new Date().toISOString() };
-  }
-  if (emailLower === "employee@nexlify.com" && password === "employeepassword123") {
-    return localUser || { id: "staff-2", name: "Israel Ujah", email: "employee@nexlify.com", role: "Employee", createdAt: new Date().toISOString() };
-  }
-  const user = staff.find(s => s.email.toLowerCase() === emailLower);
-  if (!user) {
-    return "Invalid staff email address or unlisted administrator.";
-  }
-
-  // Check stored password
   const authMapStr = localStorage.getItem("nexlify_auth_passwords") || "{}";
   const authMap = JSON.parse(authMapStr);
-  const storedPassword = authMap[emailLower];
-  
-  if (storedPassword === password) {
-    return user;
+
+  let authenticatedUser: StaffUser | null = null;
+
+  // Preset CEO account fallback
+  if (emailLower === "ceo@nexlify.com") {
+    const ceoUser = staff.find(s => s.email.toLowerCase() === emailLower) || {
+      id: "staff-1",
+      name: "David Simon",
+      email: "ceo@nexlify.com",
+      role: "CEO" as const,
+      createdAt: new Date().toISOString(),
+      allowedTabs: getDefaultTabsForRoleInDb("CEO")
+    };
+    const validPass = authMap[emailLower] || ceoUser.password || "ceopassword123";
+    if (password === validPass) {
+      if (!ceoUser.allowedTabs || ceoUser.allowedTabs.length === 0) {
+        ceoUser.allowedTabs = getDefaultTabsForRoleInDb("CEO");
+      }
+      authenticatedUser = { ...ceoUser };
+    }
   }
 
-  return "Incorrect password for administrative portal.";
+  // Preset Employee account fallback
+  if (!authenticatedUser && emailLower === "employee@nexlify.com") {
+    const empUser = staff.find(s => s.email.toLowerCase() === emailLower) || {
+      id: "staff-2",
+      name: "Israel Ujah",
+      email: "employee@nexlify.com",
+      role: "Employee" as const,
+      createdAt: new Date().toISOString(),
+      allowedTabs: getDefaultTabsForRoleInDb("Employee")
+    };
+    const validPass = authMap[emailLower] || empUser.password || "employeepassword123";
+    if (password === validPass) {
+      if (!empUser.allowedTabs || empUser.allowedTabs.length === 0) {
+        empUser.allowedTabs = getDefaultTabsForRoleInDb("Employee");
+      }
+      authenticatedUser = { ...empUser };
+    }
+  }
+
+  if (!authenticatedUser) {
+    const user = staff.find(s => s.email.toLowerCase() === emailLower);
+    if (!user) {
+      return "Invalid staff email address or account not found.";
+    }
+
+    const storedPassword = authMap[emailLower] || user.password;
+    if (storedPassword && storedPassword === password) {
+      if (!user.allowedTabs || user.allowedTabs.length === 0) {
+        user.allowedTabs = getDefaultTabsForRoleInDb(user.role);
+      }
+      authenticatedUser = { ...user };
+    } else if (!storedPassword) {
+      authMap[emailLower] = password;
+      localStorage.setItem("nexlify_auth_passwords", JSON.stringify(authMap));
+      user.password = password;
+      if (!user.allowedTabs || user.allowedTabs.length === 0) {
+        user.allowedTabs = getDefaultTabsForRoleInDb(user.role);
+      }
+      authenticatedUser = { ...user };
+    } else {
+      return "Incorrect password for administrative portal.";
+    }
+  }
+
+  // Record NEW single-session token for this device login (superseding any previous login)
+  const newSessionToken = await recordActiveSession(authenticatedUser.email);
+  authenticatedUser.activeSessionToken = newSessionToken;
+
+  return authenticatedUser;
 }
 
 export async function deleteStaffUser(email: string): Promise<boolean> {

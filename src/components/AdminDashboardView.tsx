@@ -76,6 +76,8 @@ import {
   updateStaffRole,
   updateStaffPermissions,
   updateStaffProfile,
+  updateStaffPassword,
+  verifyActiveSession,
   registerStaffUser,
   loginStaffUser,
   deleteStaffUser,
@@ -611,6 +613,78 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
     }
   };
 
+  // Security & Password Change state
+  const [changePasswordNew, setChangePasswordNew] = useState("");
+  const [changePasswordConfirm, setChangePasswordConfirm] = useState("");
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState("");
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError("");
+    setPasswordSuccess("");
+
+    if (!currentUser) return;
+
+    if (!changePasswordNew || changePasswordNew.length < 6) {
+      setPasswordError("New password must be at least 6 characters long.");
+      return;
+    }
+
+    if (changePasswordNew !== changePasswordConfirm) {
+      setPasswordError("New password and confirm password do not match.");
+      return;
+    }
+
+    setPasswordLoading(true);
+    try {
+      const ok = await updateStaffPassword(currentUser.email, changePasswordNew);
+      if (ok) {
+        setPasswordSuccess("Your staff access password has been updated successfully!");
+        setChangePasswordNew("");
+        setChangePasswordConfirm("");
+        setTimeout(() => setPasswordSuccess(""), 4000);
+      } else {
+        setPasswordError("Failed to update password. Please try again.");
+      }
+    } catch (err) {
+      setPasswordError("An unexpected error occurred while changing password.");
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
+  // Admin Reset Staff Password state & handler
+  const [resetStaffModalEmail, setResetStaffModalEmail] = useState<string | null>(null);
+  const [resetStaffNewPass, setResetStaffNewPass] = useState("");
+  const [resetStaffSuccessMsg, setResetStaffSuccessMsg] = useState("");
+  const [resetStaffErrorMsg, setResetStaffErrorMsg] = useState("");
+
+  const handleAdminResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetStaffModalEmail) return;
+    setResetStaffErrorMsg("");
+    setResetStaffSuccessMsg("");
+
+    if (resetStaffNewPass.length < 6) {
+      setResetStaffErrorMsg("Password must be at least 6 characters.");
+      return;
+    }
+
+    try {
+      await updateStaffPassword(resetStaffModalEmail, resetStaffNewPass);
+      setResetStaffSuccessMsg(`Password successfully updated for ${resetStaffModalEmail}!`);
+      setResetStaffNewPass("");
+      setTimeout(() => {
+        setResetStaffModalEmail(null);
+        setResetStaffSuccessMsg("");
+      }, 2000);
+    } catch (err) {
+      setResetStaffErrorMsg("Failed to reset staff password.");
+    }
+  };
+
   // Enforce permitted tab access based on user role
   useEffect(() => {
     if (currentUser) {
@@ -794,6 +868,47 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
     }
     setDbStatus(isFirebaseConnected());
   }, []);
+
+  // Enforce single active session per account across devices and browser tabs
+  useEffect(() => {
+    if (!currentUser || !currentUser.activeSessionToken) return;
+
+    // 1. Storage listener for instant cross-tab session change detection
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "nexlify_staff_active_sessions" && currentUser?.activeSessionToken) {
+        try {
+          const map = JSON.parse(e.newValue || "{}");
+          const latestToken = map[currentUser.email.toLowerCase()];
+          if (latestToken && latestToken !== currentUser.activeSessionToken) {
+            sessionStorage.removeItem("nexlify_admin_session");
+            setCurrentUser(null);
+            setAuthError("Session Terminated: This account was signed in on another device or tab. Simultaneous logins are restricted for security.");
+          }
+        } catch (err) {
+          console.error("Storage event error:", err);
+        }
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+
+    // 2. Periodic background verification check
+    const intervalId = setInterval(async () => {
+      if (currentUser?.email && currentUser?.activeSessionToken) {
+        const isValid = await verifyActiveSession(currentUser.email, currentUser.activeSessionToken);
+        if (!isValid) {
+          sessionStorage.removeItem("nexlify_admin_session");
+          setCurrentUser(null);
+          setAuthError("Session Terminated: This account was signed in on another device or browser. Simultaneous logins are restricted for security.");
+        }
+      }
+    }, 4000);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      clearInterval(intervalId);
+    };
+  }, [currentUser]);
 
   // Fetch dashboard data (unseen background synchronization)
   const loadDashboardData = async () => {
@@ -1815,28 +1930,7 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
               )}
             </motion.div>
 
-            {/* Quick Credentials helper tooltips */}
-            <div className={`mt-6 p-4 rounded-2xl border space-y-2.5 shadow-lg ${
-              theme === "light" ? "bg-white border-slate-200" : "bg-zinc-900/50 border-zinc-850"
-            }`}>
-              <span className="text-[9px] font-black uppercase text-zinc-500 tracking-wider block">Predefined Credentials (Test immediately):</span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className={`p-3 rounded-xl border text-left ${
-                  theme === "light" ? "bg-slate-50 border-slate-200" : "bg-zinc-950/40 border-zinc-900"
-                }`}>
-                  <span className="text-[10px] font-black text-brand-primary uppercase tracking-widest block mb-1">CEO Role (Full Access)</span>
-                  <p className="text-[11px] font-bold">Email: <span className={theme === "light" ? "text-slate-900" : "text-white"}>ceo@nexlify.com</span></p>
-                  <p className="text-[11px] font-bold">Pass: <span className={theme === "light" ? "text-slate-900" : "text-white"}>ceopassword123</span></p>
-                </div>
-                <div className={`p-3 rounded-xl border text-left ${
-                  theme === "light" ? "bg-slate-50 border-slate-200" : "bg-zinc-950/40 border-zinc-900"
-                }`}>
-                  <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest block mb-1">Employee Role (Granular Access)</span>
-                  <p className="text-[11px] font-bold">Email: <span className={theme === "light" ? "text-slate-900" : "text-white"}>employee@nexlify.com</span></p>
-                  <p className="text-[11px] font-bold">Pass: <span className={theme === "light" ? "text-slate-900" : "text-white"}>employeepassword123</span></p>
-                </div>
-              </div>
-            </div>
+
           </div>
         </div>
       ) : (
@@ -3321,6 +3415,24 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                                           <option value="Employee">Employee</option>
                                         </select>
 
+                                        {/* Reset Staff Password Button */}
+                                        <button
+                                          onClick={() => {
+                                            setResetStaffModalEmail(staff.email);
+                                            setResetStaffNewPass("");
+                                            setResetStaffSuccessMsg("");
+                                            setResetStaffErrorMsg("");
+                                          }}
+                                          className={`p-1.5 rounded-lg border transition-all ${
+                                            theme === "light"
+                                              ? "bg-slate-50 border-slate-200 hover:bg-amber-50 text-slate-400 hover:text-amber-600 hover:border-amber-200 cursor-pointer"
+                                              : "bg-zinc-950 border-zinc-850 hover:bg-amber-500/10 text-zinc-500 hover:text-amber-400 hover:border-amber-500/20 cursor-pointer"
+                                          }`}
+                                          title="Reset Password for this account"
+                                        >
+                                          <Key className="w-3.5 h-3.5" />
+                                        </button>
+
                                         {/* Delete Staff Member Button */}
                                         <button
                                           onClick={() => handleDeleteStaffUser(staff.email)}
@@ -3952,6 +4064,85 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                             
                             <p className="text-[11px] text-zinc-500 hidden sm:block font-medium">
                               Changes sync immediately across corporate blogs & team profile widgets.
+                            </p>
+                          </div>
+                        </form>
+                      </div>
+
+                      {/* Security & Change Password Card */}
+                      <div className={`p-6 sm:p-8 border rounded-3xl ${
+                        theme === "light" ? "bg-white border-slate-200/80 shadow-sm" : "bg-zinc-900/60 border-zinc-800"
+                      }`}>
+                        <form onSubmit={handleChangePassword} className="space-y-6">
+                          <h4 className="font-bold text-xs tracking-wider uppercase text-brand-primary border-b border-inherit pb-3 flex items-center justify-between">
+                            <span className="flex items-center gap-2">
+                              <Key className="w-4 h-4" /> Security & Change Password
+                            </span>
+                            <span className="text-[10px] text-zinc-500 font-normal">Account Security</span>
+                          </h4>
+
+                          {passwordError && (
+                            <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-500 text-xs font-bold flex items-center gap-2">
+                              <AlertTriangle className="w-4 h-4 shrink-0" />
+                              <span>{passwordError}</span>
+                            </div>
+                          )}
+
+                          {passwordSuccess && (
+                            <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-xs font-bold flex items-center gap-2">
+                              <CheckCircle2 className="w-4 h-4 shrink-0" />
+                              <span>{passwordSuccess}</span>
+                            </div>
+                          )}
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                            <div>
+                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                                New Password <span className="text-rose-500">*</span>
+                              </label>
+                              <input
+                                type="password"
+                                required
+                                minLength={6}
+                                value={changePasswordNew}
+                                onChange={e => setChangePasswordNew(e.target.value)}
+                                placeholder="Minimum 6 characters"
+                                className={`w-full px-4 py-2.5 border rounded-xl text-xs font-semibold focus:border-brand-primary focus:outline-none transition-colors ${
+                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                                }`}
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block mb-1">
+                                Confirm New Password <span className="text-rose-500">*</span>
+                              </label>
+                              <input
+                                type="password"
+                                required
+                                minLength={6}
+                                value={changePasswordConfirm}
+                                onChange={e => setChangePasswordConfirm(e.target.value)}
+                                placeholder="Re-enter new password"
+                                className={`w-full px-4 py-2.5 border rounded-xl text-xs font-semibold focus:border-brand-primary focus:outline-none transition-colors ${
+                                  theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                                }`}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="pt-3 flex items-center justify-between gap-4 border-t border-inherit">
+                            <button
+                              type="submit"
+                              disabled={passwordLoading}
+                              className="w-full sm:w-auto px-8 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs uppercase tracking-wider rounded-2xl shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2.5"
+                            >
+                              {passwordLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
+                              Update Password
+                            </button>
+                            
+                            <p className="text-[11px] text-zinc-500 hidden sm:block font-medium">
+                              Your password will be updated across administrative portals immediately.
                             </p>
                           </div>
                         </form>
@@ -6066,6 +6257,107 @@ export default function AdminDashboardView({ setView }: AdminDashboardViewProps)
                       <span>Confirm Delete</span>
                     </button>
                   </div>
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
+          {/* RESET STAFF PASSWORD MODAL */}
+          <AnimatePresence>
+            {resetStaffModalEmail && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setResetStaffModalEmail(null)}
+                  className="absolute inset-0 bg-black/70 backdrop-blur-md"
+                />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                  className={`relative w-full max-w-md border rounded-[2rem] shadow-2xl z-10 p-6 sm:p-8 overflow-hidden transition-all ${
+                    theme === "light" ? "bg-white border-slate-200 text-slate-900" : "bg-zinc-900 border-zinc-800 text-white"
+                  }`}
+                >
+                  <button
+                    onClick={() => setResetStaffModalEmail(null)}
+                    className={`absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer border ${
+                      theme === "light"
+                        ? "bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-800"
+                        : "bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+
+                  <div className="flex items-start gap-4 mb-5">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center shrink-0">
+                      <Key className="w-6 h-6" />
+                    </div>
+                    <div className="space-y-1 min-w-0 flex-grow pt-0.5">
+                      <span className="text-[10px] font-black uppercase text-amber-500 tracking-widest block">Administrative Credential Override</span>
+                      <h3 className="font-display font-black text-lg tracking-tight">Reset Staff Password</h3>
+                      <p className="text-xs text-zinc-400 font-medium truncate">
+                        Account: <strong className="text-brand-primary">{resetStaffModalEmail}</strong>
+                      </p>
+                    </div>
+                  </div>
+
+                  {resetStaffErrorMsg && (
+                    <div className="p-3 mb-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-500 text-xs font-bold flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      <span>{resetStaffErrorMsg}</span>
+                    </div>
+                  )}
+
+                  {resetStaffSuccessMsg && (
+                    <div className="p-3 mb-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-xs font-bold flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      <span>{resetStaffSuccessMsg}</span>
+                    </div>
+                  )}
+
+                  <form onSubmit={handleAdminResetPassword} className="space-y-4">
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-wider block mb-1 text-zinc-500">
+                        New Account Password <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        minLength={6}
+                        value={resetStaffNewPass}
+                        onChange={e => setResetStaffNewPass(e.target.value)}
+                        placeholder="Minimum 6 characters"
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs font-semibold focus:border-brand-primary focus:outline-none transition-colors ${
+                          theme === "light" ? "bg-slate-50 border-slate-200 text-slate-900" : "bg-zinc-950 border-zinc-800 text-white"
+                        }`}
+                      />
+                    </div>
+
+                    <div className="mt-6 flex items-center justify-end gap-3 pt-4 border-t border-inherit">
+                      <button
+                        type="button"
+                        onClick={() => setResetStaffModalEmail(null)}
+                        className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                          theme === "light" 
+                            ? "bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700" 
+                            : "bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-zinc-300"
+                        }`}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-5 py-2.5 rounded-xl bg-brand-primary hover:bg-brand-primary/90 text-white text-xs font-black uppercase tracking-wider shadow-lg shadow-brand-primary/20 transition-all cursor-pointer flex items-center gap-1.5"
+                      >
+                        <Lock className="w-4 h-4" />
+                        <span>Update Password</span>
+                      </button>
+                    </div>
+                  </form>
                 </motion.div>
               </div>
             )}
